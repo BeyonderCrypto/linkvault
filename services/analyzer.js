@@ -370,6 +370,80 @@ async function fetchYouTubeMetadata(url) {
   return null;
 }
 
+// Extracción ultra-confiable para TikTok vía oEmbed y resolución de enlaces cortos (vt.tiktok.com / vm.tiktok.com)
+async function fetchTikTokMetadata(url) {
+  try {
+    let targetUrl = url;
+
+    // Si es un enlace corto o redireccionado, resolver la URL canónica
+    if (url.includes('vt.tiktok.com') || url.includes('vm.tiktok.com') || !url.includes('/video/')) {
+      try {
+        const redirectRes = await fetch(url, {
+          method: 'GET',
+          redirect: 'follow',
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+          }
+        });
+        if (redirectRes.url) {
+          targetUrl = redirectRes.url;
+        }
+      } catch (e) {
+        console.warn('Error resolviendo redirección TikTok:', e.message);
+      }
+    }
+
+    // Limpiar query params de tracking (?_r=1&_t=...)
+    const cleanUrl = targetUrl.split('?')[0];
+    const oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(cleanUrl)}`;
+    const oembedRes = await fetch(oembedUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    });
+
+    if (oembedRes.ok) {
+      const data = await oembedRes.json();
+      const rawTitle = (data.title || '').trim();
+      const author = (data.author_name || data.author_unique_id || '').trim();
+      const thumbnail = data.thumbnail_url || '';
+
+      // Título limpio
+      let title = rawTitle;
+      const sentenceEnd = rawTitle.search(/[.!?\n]/);
+      if (sentenceEnd > 15 && sentenceEnd < 140) {
+        title = rawTitle.slice(0, sentenceEnd + 1).trim();
+      } else if (rawTitle.length > 120) {
+        title = rawTitle.slice(0, 115).trim() + '...';
+      }
+
+      // Resumen legible
+      let summary = rawTitle;
+      if (summary.length > 350) {
+        summary = summary.slice(0, 345).trim() + '...';
+      }
+
+      const category = classifyCategory(`${rawTitle} ${title} ${author}`, { name: 'TikTok', defaultType: 'video' });
+
+      return {
+        url,
+        title: title || `Video de TikTok de ${author}`,
+        description: rawTitle,
+        summary: summary || `Video de TikTok publicado por ${author}.`,
+        source: 'TikTok',
+        content_type: 'video',
+        category,
+        thumbnail,
+        author,
+        site_name: 'TikTok',
+        is_fallback: 0
+      };
+    }
+  } catch (err) {
+    console.warn('Advertencia TikTok oEmbed:', err.message);
+  }
+  return null;
+}
+
 // Función principal de análisis
 async function analyzeUrl(urlString) {
   let url = urlString.trim();
@@ -384,6 +458,14 @@ async function analyzeUrl(urlString) {
     const ytData = await fetchYouTubeMetadata(url);
     if (ytData && ytData.title && ytData.title !== 'Video de YouTube') {
       return ytData;
+    }
+  }
+
+  // 2. Manejo especializado para TikTok (soporta enlaces cortos vt.tiktok.com y oEmbed oficial)
+  if (platformInfo.name === 'TikTok') {
+    const ttData = await fetchTikTokMetadata(url);
+    if (ttData && ttData.title) {
+      return ttData;
     }
   }
 
