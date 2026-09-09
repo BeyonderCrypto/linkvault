@@ -421,6 +421,9 @@ async function loadStats() {
     setCatCount('count-salud', 'Salud');
     setCatCount('count-ejercicios', 'Ejercicios');
     setCatCount('count-tecnologia', 'Tecnología');
+    setCatCount('count-vida-saludable', 'Vida Saludable');
+    setCatCount('count-desarrollo-personal', 'Desarrollo Personal');
+    setCatCount('count-desarrollo-software', 'Desarrollo de Software');
     setCatCount('count-entretenimiento', 'Entretenimiento');
     setCatCount('count-otro', 'Otro');
 
@@ -823,6 +826,9 @@ function getCategoryBadgeClass(category) {
     'Salud': 'badge-cat-salud',
     'Ejercicios': 'badge-cat-ejercicios',
     'Tecnología': 'badge-cat-tecnologia',
+    'Vida Saludable': 'badge-cat-vida-saludable',
+    'Desarrollo Personal': 'badge-cat-desarrollo-personal',
+    'Desarrollo de Software': 'badge-cat-desarrollo-software',
     'Entretenimiento': 'badge-cat-entretenimiento',
     'Otro': 'badge-cat-otro'
   };

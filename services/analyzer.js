@@ -60,6 +60,24 @@ const CATEGORY_KEYWORDS = {
     'react', 'node', 'database', 'base de datos', 'api', 'tech', 'coding', 'machine learning', 'cybersecurity',
     'chatgpt', 'gpt', 'prompt', 'prompts', 'llm', 'claude', 'openai', 'deepseek', 'generativa'
   ],
+  'Vida Saludable': [
+    'vida saludable', 'nutricion', 'nutricional', 'dieta', 'salud', 'bienestar', 'longevidad', 'habitos saludables',
+    'dormir bien', 'sueno', 'antioxidante', 'antiinflamatorio', 'hidratacion', 'receta saludable', 'saludable',
+    'alimentos sanos', 'vitaminas', 'wellness', 'healthy', 'nutrition', 'healthy lifestyle', 'medicina preventiva'
+  ],
+  'Desarrollo Personal': [
+    'desarrollo personal', 'crecimiento personal', 'productividad', 'habitos', 'mentalidad', 'mindset',
+    'disciplina', 'motivacion', 'autoayuda', 'estoicismo', 'gestion del tiempo', 'enfoque', 'superacion',
+    'metas', 'objetivos', 'liderazgo personal', 'inteligencia emocional', 'psicologia positiva',
+    'procrastinacion', 'foco', 'personal development', 'productivity', 'self improvement', 'habits'
+  ],
+  'Desarrollo de Software': [
+    'desarrollo de software', 'programacion', 'programar', 'codigo', 'developer', 'software', 'codigo fuente',
+    'python', 'javascript', 'typescript', 'react', 'node', 'nodejs', 'nextjs', 'backend', 'frontend', 'fullstack',
+    'api', 'rest api', 'git', 'github', 'devops', 'docker', 'kubernetes', 'base de datos', 'sql', 'sqlite',
+    'postgres', 'arquitectura de software', 'algoritmo', 'algoritmos', 'debugging', 'testing', 'refactor',
+    'software engineering', 'web development', 'coding', 'claude code', 'sdk'
+  ],
   'Entretenimiento': [
     'entretenimiento', 'comedia', 'humor', 'meme', 'memes', 'pelicula', 'peliculas', 'serie', 'series',
     'cine', 'musica', 'cancion', 'videojuego', 'videojuegos', 'gaming', 'gamer', 'chiste', 'chistes',
