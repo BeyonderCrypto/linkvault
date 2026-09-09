@@ -296,6 +296,62 @@ function createFallbackMetadata(url, platformInfo, errorMessage = '') {
   };
 }
 
+// Extraer ID de video de YouTube
+function getYouTubeVideoId(url) {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('youtu.be')) {
+      return parsed.pathname.slice(1).split('?')[0];
+    }
+    if (parsed.pathname.includes('/shorts/')) {
+      return parsed.pathname.split('/shorts/')[1].split('/')[0].split('?')[0];
+    }
+    if (parsed.pathname.includes('/live/')) {
+      return parsed.pathname.split('/live/')[1].split('/')[0].split('?')[0];
+    }
+    return parsed.searchParams.get('v');
+  } catch {
+    return null;
+  }
+}
+
+// Extracción ultra-confiable para YouTube vía oEmbed (inmune a bloqueos por IP de centros de datos en Netlify/AWS)
+async function fetchYouTubeMetadata(url) {
+  const videoId = getYouTubeVideoId(url);
+  try {
+    const queryUrl = videoId ? `https://www.youtube.com/watch?v=${videoId}` : url;
+    const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(queryUrl)}&format=json`;
+    const res = await fetch(oembedUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const title = (data.title || '').trim();
+      const author = (data.author_name || '').trim();
+      const thumbnail = (videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : '') || data.thumbnail_url || '';
+      const category = classifyCategory(`${title} ${author}`, { name: 'YouTube', defaultType: 'video' });
+      const summary = `Video publicado por ${author || 'un creador'} en YouTube: "${title}".`;
+
+      return {
+        url,
+        title: title || 'Video de YouTube',
+        description: summary,
+        summary,
+        source: 'YouTube',
+        content_type: 'video',
+        category,
+        thumbnail,
+        author,
+        site_name: 'YouTube',
+        is_fallback: 0
+      };
+    }
+  } catch (err) {
+    console.warn('Advertencia oEmbed YouTube:', err.message);
+  }
+  return null;
+}
+
 // Función principal de análisis
 async function analyzeUrl(urlString) {
   let url = urlString.trim();
@@ -304,6 +360,14 @@ async function analyzeUrl(urlString) {
   }
 
   const platformInfo = detectPlatform(url);
+
+  // 1. Manejo especializado para YouTube (evita el muro de cookies consent.youtube.com en Netlify)
+  if (platformInfo.name === 'YouTube') {
+    const ytData = await fetchYouTubeMetadata(url);
+    if (ytData && ytData.title && ytData.title !== 'Video de YouTube') {
+      return ytData;
+    }
+  }
 
   // Intentar descargar y raspar la página
   try {
