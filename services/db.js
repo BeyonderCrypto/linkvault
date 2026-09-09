@@ -1,18 +1,35 @@
 require('dotenv').config();
-const { createClient } = require('@libsql/client');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
-const DB_DIR = path.join(__dirname, '..', 'data');
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
-}
+// Detección de entorno Serverless (Netlify / AWS Lambda)
+const isServerless = Boolean(
+  process.env.NETLIFY ||
+  process.env.AWS_LAMBDA_FUNCTION_NAME ||
+  process.env.LAMBDA_TASK_ROOT
+);
 
-const LOCAL_DB_PATH = path.join(DB_DIR, 'links.db');
-
-// Si existe TURSO_DATABASE_URL, nos conectamos a Turso Cloud.
-// Si no, usamos el archivo local SQLite en data/links.db
 const isTursoCloud = Boolean(process.env.TURSO_DATABASE_URL);
+
+// Determinar ruta de base de datos local
+let LOCAL_DB_PATH = '';
+if (!isTursoCloud) {
+  if (isServerless) {
+    // En Lambda/Netlify el único directorio con permisos de escritura es /tmp
+    LOCAL_DB_PATH = path.join(os.tmpdir(), 'links.db');
+  } else {
+    const DB_DIR = path.join(__dirname, '..', 'data');
+    try {
+      if (!fs.existsSync(DB_DIR)) {
+        fs.mkdirSync(DB_DIR, { recursive: true });
+      }
+    } catch (e) {
+      console.warn('No se pudo crear carpeta data local:', e.message);
+    }
+    LOCAL_DB_PATH = path.join(DB_DIR, 'links.db');
+  }
+}
 
 let client = null;
 
@@ -20,12 +37,15 @@ function getClient() {
   if (!client) {
     if (isTursoCloud) {
       console.log('📡 Conectando a Turso Cloud SQLite:', process.env.TURSO_DATABASE_URL);
+      // Usar cliente web puro en JS (sin dependencias binarias nativas C++ para Lambda)
+      const { createClient } = require('@libsql/client/web');
       client = createClient({
         url: process.env.TURSO_DATABASE_URL,
         authToken: process.env.TURSO_AUTH_TOKEN
       });
     } else {
-      // Conexión local con archivo SQLite
+      console.log('📁 Usando SQLite local en:', LOCAL_DB_PATH);
+      const { createClient } = require('@libsql/client');
       client = createClient({
         url: `file:${LOCAL_DB_PATH}`
       });
@@ -36,39 +56,139 @@ function getClient() {
 
 let schemaInitialized = false;
 
+// Datos de demostración iniciales para cuando la base de datos está vacía
+const INITIAL_DEMO_LINKS = [
+  {
+    url: 'https://www.facebook.com/share/r/1Vi1Fowant/',
+    title: '11 comandos que convierten ChatGPT en tu restaurador de fotos, tu diseñador de anuncios y tu sistema de estudio',
+    description: 'Comandos y prompts clave para aprovechar la inteligencia artificial generativa con ChatGPT.',
+    summary: 'Video corto de Facebook Reels donde se explican 11 comandos prácticos para restaurar fotos, mejorar imágenes y optimizar el estudio usando ChatGPT.',
+    source: 'Facebook',
+    content_type: 'video',
+    category: 'Tecnología',
+    thumbnail: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=600&auto=format&fit=crop&q=80',
+    is_favorite: 1,
+    notes: 'Revisar comandos /restore y /upscale para imágenes.',
+    tags: 'chatgpt, ia, prompts, facebook'
+  },
+  {
+    url: 'https://www.youtube.com/watch?v=kqtD5dpn9C8',
+    title: 'Python for Beginners - Full Course (Tutorial)',
+    description: 'Aprende programación desde cero con Python en este curso completo y detallado.',
+    summary: 'Curso interactivo en video donde se enseñan los fundamentos de la programación en Python: variables, funciones, bucles y estructuras de datos.',
+    source: 'YouTube',
+    content_type: 'video',
+    category: 'Educativo',
+    thumbnail: 'https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=600&auto=format&fit=crop&q=80',
+    is_favorite: 1,
+    notes: 'Excelente referencia para repasar sintaxis básica.',
+    tags: 'python, programacion, tutorial'
+  },
+  {
+    url: 'https://www.tiktok.com/@fitnesscoach/video/723456789',
+    title: 'Rutina HIIT de 15 Minutos para Quemar Grasa en Casa',
+    description: 'Ejercicios intensos de calistenia y cardio sin equipo.',
+    summary: 'Video corto de TikTok con rutina exprés de 5 ejercicios combinados (burpees, sentadillas con salto y plancha) para realizar en casa sin pesas.',
+    source: 'TikTok',
+    content_type: 'video',
+    category: 'Ejercicios',
+    thumbnail: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600&auto=format&fit=crop&q=80',
+    is_favorite: 1,
+    notes: 'Hacerla los martes y jueves por la mañana.',
+    tags: 'hiit, cardio, fitness, casa'
+  },
+  {
+    url: 'https://www.eventbrite.com/e/global-business-marketing-summit-2026-tickets-998877',
+    title: 'Cumbre Global de Emprendimiento y Finanzas 2026',
+    description: 'Conferencia presencial y virtual sobre inversiones, escalamiento de startups y marketing digital.',
+    summary: 'Evento para líderes empresariales y fundadores de startups. Incluye paneles con inversores ángel y talleres de crecimiento B2B.',
+    source: 'Eventbrite',
+    content_type: 'evento',
+    category: 'Negocios',
+    thumbnail: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80',
+    is_favorite: 0,
+    notes: 'El registro temprano vence a fin de mes.',
+    tags: 'conferencia, negocios, startups, inversion'
+  },
+  {
+    url: 'https://www.instagram.com/reel/C89abcdef/',
+    title: 'Tips de Nutrición y Hábitos de Sueño para Longevidad',
+    description: 'Guía práctica de un médico especialista en hábitos saludables.',
+    summary: 'Publicación en Instagram con recomendaciones médicas sobre cómo regular los ritmos circadianos, la exposición a la luz matutina y alimentos antiinflamatorios.',
+    source: 'Instagram',
+    content_type: 'video',
+    category: 'Salud',
+    thumbnail: 'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop&q=80',
+    is_favorite: 0,
+    notes: 'Probar cenar al menos 3 horas antes de dormir.',
+    tags: 'salud, nutricion, descanso, longevidad'
+  }
+];
+
 async function initSchema() {
   if (schemaInitialized) return;
   const db = getClient();
 
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS links (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      url TEXT NOT NULL,
-      title TEXT,
-      description TEXT,
-      summary TEXT,
-      source TEXT,
-      content_type TEXT,
-      category TEXT,
-      thumbnail TEXT,
-      author TEXT,
-      site_name TEXT,
-      status TEXT DEFAULT 'active',
-      is_favorite INTEGER DEFAULT 0,
-      notes TEXT,
-      tags TEXT,
-      is_fallback INTEGER DEFAULT 0,
-      created_at TEXT DEFAULT (datetime('now', 'localtime')),
-      updated_at TEXT DEFAULT (datetime('now', 'localtime'))
-    )
-  `);
+  try {
+    await db.execute(`
+      CREATE TABLE IF NOT EXISTS links (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        url TEXT NOT NULL,
+        title TEXT,
+        description TEXT,
+        summary TEXT,
+        source TEXT,
+        content_type TEXT,
+        category TEXT,
+        thumbnail TEXT,
+        author TEXT,
+        site_name TEXT,
+        status TEXT DEFAULT 'active',
+        is_favorite INTEGER DEFAULT 0,
+        notes TEXT,
+        tags TEXT,
+        is_fallback INTEGER DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now', 'localtime')),
+        updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+      )
+    `);
 
-  await db.execute(`CREATE INDEX IF NOT EXISTS idx_links_category ON links(category)`);
-  await db.execute(`CREATE INDEX IF NOT EXISTS idx_links_content_type ON links(content_type)`);
-  await db.execute(`CREATE INDEX IF NOT EXISTS idx_links_source ON links(source)`);
-  await db.execute(`CREATE INDEX IF NOT EXISTS idx_links_is_favorite ON links(is_favorite)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_links_category ON links(category)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_links_content_type ON links(content_type)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_links_source ON links(source)`);
+    await db.execute(`CREATE INDEX IF NOT EXISTS idx_links_is_favorite ON links(is_favorite)`);
 
-  schemaInitialized = true;
+    // Auto-sembrar si la base de datos está totalmente vacía
+    const countRes = await db.execute('SELECT COUNT(*) as count FROM links');
+    const totalCount = countRes.rows[0]?.count || 0;
+    if (totalCount === 0) {
+      console.log('🌱 Sembrando datos de demostración iniciales...');
+      const now = new Date().toISOString();
+      for (const item of INITIAL_DEMO_LINKS) {
+        await db.execute({
+          sql: `
+            INSERT INTO links (
+              url, title, description, summary, source, content_type,
+              category, thumbnail, author, site_name, status, is_favorite,
+              notes, tags, is_fallback, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          args: [
+            item.url, item.title, item.description, item.summary, item.source,
+            item.content_type, item.category, item.thumbnail, '', item.source,
+            'active', item.is_favorite || 0, item.notes || '', item.tags || '',
+            0, now, now
+          ]
+        });
+      }
+      console.log('✅ Datos de demostración insertados con éxito.');
+    }
+
+    schemaInitialized = true;
+  } catch (err) {
+    console.error('Error al inicializar el esquema de la base de datos:', err);
+    throw err;
+  }
 }
 
 async function getAllLinks({ search, category, contentType, source, isFavorite, sort = 'newest' } = {}) {

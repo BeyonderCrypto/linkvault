@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const multer = require('multer');
 
 const db = require('./services/db');
@@ -11,9 +12,9 @@ const analyzer = require('./services/analyzer');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configuración de subida temporal
+// Configuración de subida temporal usando os.tmpdir() (seguro para entornos serverless y locales)
 const upload = multer({
-  dest: path.join(__dirname, 'data', 'temp_uploads'),
+  dest: path.join(os.tmpdir(), 'linkvault_uploads'),
   limits: { fileSize: 50 * 1024 * 1024 }
 });
 
@@ -24,7 +25,16 @@ app.use(express.urlencoded({ extended: true }));
 // Servir frontend estático
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Router para endpoints de la API (compatible con /api y con Netlify Functions)
+// Middleware para normalizar la ruta en entornos serverless (Netlify Functions)
+app.use((req, res, next) => {
+  // Eliminar prefijos de funciones de Netlify o /api para que las rutas coincidan limpiamente
+  req.url = req.url.replace(/^\/\.netlify\/functions\/api/, '');
+  req.url = req.url.replace(/^\/api/, '');
+  if (!req.url.startsWith('/')) req.url = '/' + req.url;
+  next();
+});
+
+// Router para endpoints de la API
 const apiRouter = express.Router();
 
 // 1. Analizar URL
@@ -140,11 +150,12 @@ apiRouter.get('/stats', async (req, res) => {
     const stats = await db.getStats();
     res.json(stats);
   } catch (error) {
+    console.error('Error al obtener estadísticas:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// 9. Exportar SQLite .db (solo disponible si se usa almacenamiento local o archivo disponible)
+// 9. Exportar SQLite .db
 apiRouter.get('/export/db', async (req, res) => {
   try {
     const dbPath = db.getDbPath();
@@ -189,13 +200,11 @@ apiRouter.post('/import/json', async (req, res) => {
   }
 });
 
-// Montar router en prefijos correspondientes
-app.use('/api', apiRouter);
-app.use('/.netlify/functions/api/api', apiRouter);
-app.use('/.netlify/functions/api', apiRouter);
+// Montar router
+app.use(apiRouter);
 
-// Iniciar servidor standalone si no es importado por Netlify
-if (process.env.NETLIFY !== 'true' && !process.env.AWS_LAMBDA_FUNCTION_NAME) {
+// Iniciar servidor SOLO si se ejecuta directamente con `node server.js`
+if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`====================================================`);
     console.log(`🚀 LinkVault Servidor activo en: http://localhost:${PORT}`);

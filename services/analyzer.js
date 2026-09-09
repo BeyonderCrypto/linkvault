@@ -57,7 +57,8 @@ const CATEGORY_KEYWORDS = {
     'tecnologia', 'programacion', 'programar', 'desarrollo', 'software', 'hardware', 'codigo', 'developer',
     'python', 'javascript', 'typescript', 'ia', 'inteligencia artificial', 'ai', 'gadget', 'gadgets',
     'computadora', 'servidor', 'app', 'aplicacion', 'ciberseguridad', 'linux', 'cloud', 'devops',
-    'react', 'node', 'database', 'base de datos', 'api', 'tech', 'coding', 'machine learning', 'cybersecurity'
+    'react', 'node', 'database', 'base de datos', 'api', 'tech', 'coding', 'machine learning', 'cybersecurity',
+    'chatgpt', 'gpt', 'prompt', 'prompts', 'llm', 'claude', 'openai', 'deepseek', 'generativa'
   ],
   'Entretenimiento': [
     'entretenimiento', 'comedia', 'humor', 'meme', 'memes', 'pelicula', 'peliculas', 'serie', 'series',
@@ -338,7 +339,20 @@ async function analyzeUrl(urlString) {
     const twitterTitle = $('meta[name="twitter:title"]').attr('content');
     const docTitle = $('title').text();
     const h1Title = $('h1').first().text();
-    const title = (ogTitle || twitterTitle || docTitle || h1Title || '').trim().replace(/\s+/g, ' ') || 'Sin título';
+    let title = (ogTitle || twitterTitle || docTitle || h1Title || '').trim().replace(/\s+/g, ' ') || 'Sin título';
+
+    let author = $('meta[name="author"]').attr('content') ||
+                   $('meta[property="article:author"]').attr('content') || '';
+
+    // Limpiar métricas de redes sociales en el título (ej: Facebook Reels "21 mil reproducciones · 20 mil reacciones | ")
+    if (platformInfo.name === 'Facebook' || platformInfo.name === 'Instagram' || platformInfo.name === 'TikTok') {
+      title = title.replace(/^[\d.,\s]+(?:mil|k|m|millones)?\s*(?:reproducciones|vistas|views|reacciones|likes|veces compartida)?\s*[·•|-]\s*[\d.,\s]+(?:mil|k|m|millones)?\s*(?:reproducciones|vistas|views|reacciones|likes|veces compartida)?\s*\|\s*/i, '');
+      const parts = title.split(' | ');
+      if (parts.length > 1 && parts[parts.length - 1].length < 50) {
+        if (!author) author = parts[parts.length - 1].trim();
+        title = parts.slice(0, -1).join(' | ').trim();
+      }
+    }
 
     // Extraer descripciones
     const ogDescription = $('meta[property="og:description"]').attr('content');
@@ -354,8 +368,6 @@ async function analyzeUrl(urlString) {
     // Extraer otros metadatos
     const ogType = $('meta[property="og:type"]').attr('content') || '';
     const siteName = $('meta[property="og:site_name"]').attr('content') || platformInfo.name;
-    const author = $('meta[name="author"]').attr('content') ||
-                   $('meta[property="article:author"]').attr('content') || '';
 
     // Detección de schema.org Event
     let schemaType = '';
