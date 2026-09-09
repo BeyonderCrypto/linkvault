@@ -1,0 +1,6 @@
+node_modules/
+.env
+.netlify/
+data/links.db
+data/temp_uploads/
+*.log
