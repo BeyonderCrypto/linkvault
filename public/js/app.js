@@ -700,7 +700,9 @@ async function loadLinks() {
 
   const container = document.getElementById('links-grid');
   const emptyState = document.getElementById('empty-state');
-  const resultsCounter = document.getElementById('total-results-count');
+  const resultsText = document.getElementById('results-count-text');
+
+  if (resultsText) resultsText.textContent = 'Actualizando enlaces...';
 
   try {
     const params = new URLSearchParams();
@@ -718,10 +720,21 @@ async function loadLinks() {
     AppState.links = links;
 
     renderLinks(links);
-    if (resultsCounter) resultsCounter.textContent = links.length;
+    updateResultsCount(links.length);
     loadStats(); // refrescar contadores en los chips
   } catch (err) {
     console.error('Error cargando enlaces:', err);
+  }
+}
+
+function updateResultsCount(count) {
+  const el = document.getElementById('results-count-text');
+  if (!el) return;
+
+  if (count === 1) {
+    el.textContent = '1 enlace encontrado';
+  } else {
+    el.textContent = `${count} enlaces encontrados`;
   }
 }
 
@@ -763,120 +776,106 @@ function createLinkCardElement(link) {
   card.className = 'link-card';
   card.id = `link-card-${link.id}`;
 
-  const typeInfo = TYPE_LABELS[link.content_type] || { label: 'Web', icon: '🌐' };
-  const sourceIcon = PLATFORM_ICONS[link.source] || PLATFORM_ICONS['Web'];
-  const sourceClass = getSourceBadgeClass(link.source);
-  const categoryClass = getCategoryBadgeClass(link.category);
+  const sourceName = link.source || 'Web';
+  const sourceClass = getSourceBadgeClass(sourceName);
+  const sourceIcon = PLATFORM_ICONS[sourceName] || PLATFORM_ICONS['Web'];
 
-  // Formato de fecha amigable
-  let formattedDate = '';
+  const typeInfo = TYPE_LABELS[link.content_type] || { label: 'Web', icon: '🌐' };
+  const catClass = getCategoryBadgeClass(link.category);
+
+  // Fecha amigable
+  let dateDisplay = '';
   try {
     const d = new Date(link.created_at);
-    formattedDate = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
-  } catch (e) {
-    formattedDate = '';
+    dateDisplay = d.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
+  } catch {
+    dateDisplay = '';
+  }
+
+  // Miniatura o placeholder estilizado
+  let thumbHtml = '';
+  if (link.thumbnail) {
+    thumbHtml = `
+      <div class="link-thumb-container">
+        <img src="${escapeHtml(link.thumbnail)}" alt="${escapeHtml(link.title)}" class="link-thumb-img" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'link-thumb-placeholder\\'>${typeInfo.icon}</div>';">
+      </div>
+    `;
+  } else {
+    thumbHtml = `
+      <div class="link-thumb-container">
+        <div class="link-thumb-placeholder">
+          <span style="font-size: 1.6rem;">${typeInfo.icon}</span>
+        </div>
+      </div>
+    `;
   }
 
   card.innerHTML = `
-    <!-- Cabecera de la tarjeta con Badges -->
-    <div class="card-meta-top">
-      <div class="card-badges-left">
-        <span class="badge-source ${sourceClass}">
+    <div class="link-card-top">
+      <div class="link-badges">
+        <span class="badge-source ${sourceClass}" title="Origen: ${escapeHtml(sourceName)}">
           ${sourceIcon}
-          <span>${escapeHtml(link.source || 'Web')}</span>
+          <span>${escapeHtml(sourceName)}</span>
         </span>
-        <span class="badge-content-type">
-          ${typeInfo.icon} ${typeInfo.label}
+        <span class="badge badge-type">
+          ${typeInfo.icon} ${typeInfo.label.toUpperCase()}
         </span>
-        <span class="badge-category ${categoryClass}">
-          ${escapeHtml(link.category || 'Otro')}
+        <span class="badge badge-cat ${catClass}">
+          ${escapeHtml((link.category || 'Otro').toUpperCase())}
         </span>
       </div>
-
-      <button class="btn-fav ${link.is_favorite ? 'active' : ''}" title="Alternar Favorito" data-id="${link.id}">
-        <svg viewBox="0 0 24 24" fill="${link.is_favorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+      <button class="btn-fav ${link.is_favorite ? 'active' : ''}" data-id="${link.id}" title="${link.is_favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="${link.is_favorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
         </svg>
       </button>
     </div>
 
-    <!-- Miniatura opcional -->
-    ${link.thumbnail ? `
-      <div class="card-thumbnail-wrapper">
-        <img src="${escapeHtml(link.thumbnail)}" alt="Miniatura" loading="lazy" onerror="this.parentElement.style.display='none'">
+    <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" class="link-title-link" title="${escapeHtml(link.title)}">
+      ${escapeHtml(link.title)}
+    </a>
+
+    ${link.is_fallback ? `
+      <div class="fallback-indicator" title="Acceso directo restringido en la plataforma">
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        <span>Lectura básica (acceso restringido)</span>
       </div>
     ` : ''}
 
-    <!-- Cuerpo del contenido -->
-    <div class="card-body">
-      <h3 class="card-title">
-        <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" class="card-title-link">
-          ${escapeHtml(link.title || 'Sin título')}
-        </a>
-      </h3>
-
-      ${link.summary ? `
-        <div class="card-summary">
-          <span class="summary-label">Resumen:</span>
-          <p class="summary-text">${escapeHtml(link.summary)}</p>
-        </div>
-      ` : ''}
-
-      ${link.notes ? `
-        <div class="card-notes">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 20h9"></path>
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-          </svg>
-          <span>${escapeHtml(link.notes)}</span>
-        </div>
-      ` : ''}
-
-      ${link.tags ? `
-        <div class="card-tags">
-          ${link.tags.split(',').filter(Boolean).map(tag => `
-            <span class="tag-pill">#${escapeHtml(tag.trim())}</span>
-          `).join('')}
-        </div>
-      ` : ''}
+    <div class="link-card-body">
+      ${thumbHtml}
+      <p class="link-summary-text">${escapeHtml(link.summary || 'Sin resumen disponible.')}</p>
     </div>
 
-    <!-- Pie de la Tarjeta con acciones rápidas -->
-    <div class="card-footer">
-      <span class="card-date">${formattedDate}</span>
+    ${link.notes ? `
+      <div class="user-notes-snippet" title="Tus notas personales">
+        💬 "${escapeHtml(link.notes)}"
+      </div>
+    ` : ''}
 
+    <div class="link-card-footer">
+      <span class="link-date-tag">📅 ${dateDisplay}</span>
       <div class="card-actions">
-        <button class="btn-card-action btn-copy-link" title="Copiar enlace directo" data-url="${escapeHtml(link.url)}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-          </svg>
+        <button class="btn-card-action btn-copy-url" data-url="${escapeHtml(link.url)}" title="Copiar enlace">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
         </button>
-
-        <button class="btn-card-action btn-edit-link" title="Editar enlace" data-id="${link.id}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-          </svg>
+        <button class="btn-card-action btn-edit-link" data-id="${link.id}" title="Editar">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
         </button>
-
-        <button class="btn-card-action btn-delete-link" title="Eliminar de mi bóveda" data-id="${link.id}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
+        <button class="btn-card-action btn-delete btn-delete-link" data-id="${link.id}" title="Eliminar">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
         </button>
       </div>
     </div>
   `;
 
-  // Asignar eventos de la tarjeta
+  // Asignar manejadores a los botones de la tarjeta
   card.querySelector('.btn-fav')?.addEventListener('click', (e) => {
     e.stopPropagation();
     handleToggleFavorite(link.id);
   });
 
-  card.querySelector('.btn-copy-link')?.addEventListener('click', (e) => {
+  card.querySelector('.btn-copy-url')?.addEventListener('click', (e) => {
     e.stopPropagation();
     copyToClipboard(link.url);
   });

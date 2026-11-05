@@ -332,33 +332,23 @@
         </div>
 
         <div class="filter-group">
-          <label for="filter-sort" class="filter-label">Ordenar:</label>
+          <label for="filter-sort" class="filter-label">Orden:</label>
           <select id="filter-sort" class="filter-select">
             <option value="newest">Más recientes</option>
             <option value="oldest">Más antiguos</option>
             <option value="title_asc">Título (A-Z)</option>
-            <option value="title_desc">Título (Z-A)</option>
           </select>
         </div>
-
-        <button id="btn-toggle-favorites-filter" class="btn-fav-filter" title="Mostrar solo favoritos">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-          </svg>
-          <span>Solo Favoritos</span>
-        </button>
       </section>
 
-      <!-- Lista de Enlaces en Tarjetas -->
-      <section class="links-section">
-        <div class="section-meta-header">
-          <h2 class="section-title">
-            <span id="active-category-title">Todos los Enlaces</span>
-            <span class="badge-counter" id="total-results-count">0</span>
-          </h2>
-
-          <button id="btn-quick-export-json" class="btn btn-secondary btn-sm btn-icon-text btn-export-accent" title="Descargar todos mis enlaces en un archivo JSON">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+      <!-- Contador de Resultados y Estado -->
+      <div class="results-header">
+        <div class="results-status">
+          <span id="results-count-text">Cargando enlaces...</span>
+        </div>
+        <div class="filter-tags-active" id="active-filters-container">
+          <button id="btn-quick-export-json" class="btn btn-secondary btn-sm btn-icon-text btn-export-accent" title="Descargar todos mis enlaces en formato JSON">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
@@ -366,25 +356,27 @@
             <span>Descargar JSON</span>
           </button>
         </div>
+      </div>
 
-        <!-- Rejilla de Tarjetas -->
-        <div id="links-grid" class="links-grid">
-          <!-- Renderizado dinámico desde app.js -->
-        </div>
-
-        <!-- Estado Vacío -->
-        <div id="empty-state" class="empty-state hidden">
-          <div class="empty-icon-wrapper">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-            </svg>
-          </div>
-          <h3 class="empty-title">No hay enlaces guardados</h3>
-          <p class="empty-desc">Comienza agregando enlaces de YouTube, TikTok, conferencias o artículos web.</p>
-          <button id="btn-empty-add" class="btn btn-primary mt-3">Guardar mi Primer Enlace</button>
-        </div>
+      <!-- Cuadrícula de Enlaces -->
+      <section id="links-grid" class="links-grid">
+        <!-- Renderizado dinámico desde app.js -->
       </section>
+
+      <!-- Estado Vacío -->
+      <div id="empty-state" class="empty-state hidden">
+        <div class="empty-illustration">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M16 16s-1.5-2-4-2-4 2-4 2"></path>
+            <line x1="9" y1="9" x2="9.01" y2="9"></line>
+            <line x1="15" y1="9" x2="15.01" y2="9"></line>
+          </svg>
+        </div>
+        <h3>No se encontraron enlaces</h3>
+        <p id="empty-state-msg">No hay enlaces guardados en esta categoría o filtro.</p>
+        <button id="btn-empty-add" class="btn btn-primary" style="margin-top: 14px;">Agregar Enlace Ahora</button>
+      </div>
     </main>
 
     <!-- Barra de Navegación Móvil Inferior -->
