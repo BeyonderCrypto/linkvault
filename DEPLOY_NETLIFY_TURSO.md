@@ -77,6 +77,8 @@ git push -u origin main
 |---|---|
 | `TURSO_DATABASE_URL` | `libsql://linkvault-db-tuusuario.turso.io` |
 | `TURSO_AUTH_TOKEN` | `tu_token_generado_en_turso` |
+| `GOOGLE_CLIENT_ID` | `tu-cliente-id.apps.googleusercontent.com` (de Google Cloud Console) |
+| `SESSION_SECRET` | `clave_secreta_aleatoria_para_sesiones` |
 
 6. Haz clic en **"Deploy Site"**.
 

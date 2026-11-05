@@ -1,6 +1,6 @@
 /**
  * LINKVAULT - Frontend Application Logic
- * Manejo de eventos, estado reactivo, consumo de API y renderizado dinámico
+ * Manejo de eventos, estado reactivo, consumo de API, autenticación Google y animaciones GSAP
  */
 
 // Estado global de la aplicación
@@ -14,7 +14,10 @@ const AppState = {
   searchTerm: '',
   sort: 'newest',
   currentEditingId: null,
-  isAnalyzing: false
+  isAnalyzing: false,
+  user: null,
+  token: localStorage.getItem('linkvault_token') || null,
+  googleConfig: null
 };
 
 // Iconos y etiquetas de plataformas para renderizado rápido
@@ -39,16 +42,496 @@ const TYPE_LABELS = {
 };
 
 // ==========================================================
+// CLIENTE HTTP CON AUTENTICACIÓN AUTOMÁTICA
+// ==========================================================
+async function authFetch(url, options = {}) {
+  const headers = options.headers ? { ...options.headers } : {};
+  if (AppState.token) {
+    headers['Authorization'] = `Bearer ${AppState.token}`;
+  }
+  options.headers = headers;
+
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    console.warn('Sesión no autorizada o expirada (401)');
+    logout(false);
+    showToast('Tu sesión ha expirado. Por favor inicia sesión nuevamente.', 'error');
+    throw new Error('Sesión no autorizada');
+  }
+  return res;
+}
+
+// ==========================================================
 // INICIALIZACIÓN DE LA APLICACIÓN
 // ==========================================================
 document.addEventListener('DOMContentLoaded', () => {
   initEventListeners();
-  loadLinks();
-  loadStats();
+  initAuth();
 });
 
-// Registrar eventos de interfaz
+// ==========================================================
+// MÓDULO DE AUTENTICACIÓN GOOGLE & SESIÓN
+// ==========================================================
+async function initAuth() {
+  try {
+    const configRes = await fetch('/api/auth/config');
+    if (configRes.ok) {
+      AppState.googleConfig = await configRes.json();
+    }
+  } catch (err) {
+    console.warn('No se pudo cargar configuración de auth:', err);
+  }
+
+  // Configurar Google Identity Services si hay GOOGLE_CLIENT_ID
+  const clientId = AppState.googleConfig?.googleClientId;
+  const setupGIS = () => {
+    if (clientId && window.google?.accounts?.id) {
+      try {
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: handleGoogleCredentialResponse,
+          auto_select: false
+        });
+
+        const container = document.getElementById('g_id_signin_container');
+        if (container) {
+          google.accounts.id.renderButton(container, {
+            theme: 'filled_black',
+            size: 'large',
+            type: 'standard',
+            shape: 'pill',
+            text: 'signin_with',
+            logo_alignment: 'left',
+            width: 280
+          });
+          // Si Google renderizó su botón nativo, ocultar botón de respaldo
+          const customBtn = document.getElementById('btn-custom-google-login');
+          if (customBtn) customBtn.style.display = 'none';
+        }
+      } catch (e) {
+        console.warn('Nota GIS:', e);
+      }
+    }
+  };
+
+  // Reintentar si el script de Google tarda unos ms en cargarse
+  if (window.google?.accounts?.id) {
+    setupGIS();
+  } else {
+    window.addEventListener('load', setupGIS);
+  }
+
+  // Verificar si ya existe una sesión guardada en localStorage
+  const savedToken = localStorage.getItem('linkvault_token');
+  if (savedToken) {
+    AppState.token = savedToken;
+    try {
+      const meRes = await fetch('/api/auth/me', {
+        headers: { 'Authorization': `Bearer ${savedToken}` }
+      });
+      if (meRes.ok) {
+        const data = await meRes.json();
+        AppState.user = data.user;
+        updateUserUI(data.user);
+        updateExportLinks();
+
+        // Mostrar directamente el dashboard
+        document.getElementById('login-view')?.classList.add('hidden');
+        document.getElementById('app-dashboard')?.classList.remove('hidden');
+
+        loadLinks();
+        loadStats();
+        return;
+      }
+    } catch (err) {
+      console.warn('Sesión previa inválida o expirada:', err);
+    }
+  }
+
+  // Si no hay sesión válida, mostrar la pantalla de logueo con animaciones GSAP
+  document.getElementById('login-view')?.classList.remove('hidden');
+  document.getElementById('app-dashboard')?.classList.add('hidden');
+  initLoginAnimation();
+}
+
+async function handleGoogleCredentialResponse(response) {
+  if (!response || !response.credential) return;
+
+  try {
+    showToast('Autenticando con Google...', 'success');
+    const res = await fetch('/api/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credential: response.credential })
+    });
+
+    if (!res.ok) {
+      const errData = await res.json();
+      throw new Error(errData.error || 'Error de autenticación');
+    }
+
+    const data = await res.json();
+    completeLogin(data.token, data.user);
+  } catch (err) {
+    console.error('Error Google Auth:', err);
+    showToast(err.message || 'Error al iniciar sesión con Google', 'error');
+  }
+}
+
+async function handleDevLogin(email, name = null) {
+  try {
+    showToast('Iniciando sesión...', 'success');
+    const res = await fetch('/api/auth/dev-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name })
+    });
+
+    if (!res.ok) throw new Error('Error al iniciar sesión');
+    const data = await res.json();
+    completeLogin(data.token, data.user);
+  } catch (err) {
+    showToast(err.message || 'Error al iniciar sesión', 'error');
+  }
+}
+
+function completeLogin(token, user) {
+  AppState.token = token;
+  AppState.user = user;
+  localStorage.setItem('linkvault_token', token);
+  localStorage.setItem('linkvault_user', JSON.stringify(user));
+
+  updateUserUI(user);
+  updateExportLinks();
+
+  animateTransitionToDashboard(() => {
+    loadLinks();
+    loadStats();
+    showToast(`¡Bienvenido, ${user.name || user.email}!`, 'success');
+  });
+}
+
+function logout(showNotice = true) {
+  AppState.token = null;
+  AppState.user = null;
+  localStorage.removeItem('linkvault_token');
+  localStorage.removeItem('linkvault_user');
+
+  animateTransitionToLogin();
+  if (showNotice) {
+    showToast('Has cerrado sesión correctamente', 'success');
+  }
+}
+
+function updateUserUI(user) {
+  if (!user) return;
+  const displayName = document.getElementById('user-display-name');
+  const displayEmail = document.getElementById('user-display-email');
+  const dropdownName = document.getElementById('dropdown-user-name');
+  const dropdownEmail = document.getElementById('dropdown-user-email');
+  const avatarImg = document.getElementById('user-avatar');
+  const avatarPlaceholder = document.getElementById('user-avatar-placeholder');
+
+  const name = user.name || user.email.split('@')[0];
+  if (displayName) displayName.textContent = name;
+  if (displayEmail) displayEmail.textContent = user.email;
+  if (dropdownName) dropdownName.textContent = name;
+  if (dropdownEmail) dropdownEmail.textContent = user.email;
+
+  // Iniciales para el avatar
+  const initials = name
+    .split(' ')
+    .filter(Boolean)
+    .map(n => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'LV';
+
+  if (avatarPlaceholder) avatarPlaceholder.textContent = initials;
+
+  if (user.picture && avatarImg) {
+    avatarImg.src = user.picture;
+    avatarImg.style.display = 'block';
+    if (avatarPlaceholder) avatarPlaceholder.style.display = 'none';
+  } else {
+    if (avatarImg) avatarImg.style.display = 'none';
+    if (avatarPlaceholder) avatarPlaceholder.style.display = 'flex';
+  }
+}
+
+function updateExportLinks() {
+  const jsonBtn = document.getElementById('btn-download-json');
+  const dbBtn = document.getElementById('btn-download-db');
+  const token = AppState.token ? encodeURIComponent(AppState.token) : '';
+  if (jsonBtn) jsonBtn.href = `/api/export/json?token=${token}`;
+  if (dbBtn) dbBtn.href = `/api/export/db?token=${token}`;
+}
+
+/**
+ * Descarga la base completa de enlaces del usuario en formato JSON estructurado
+ */
+async function downloadLinksJson() {
+  if (!AppState.token) {
+    showToast('Debes iniciar sesión para descargar tus enlaces', 'error');
+    return;
+  }
+
+  try {
+    showToast('Generando archivo JSON de tus enlaces...', 'success');
+
+    const res = await authFetch('/api/export/json');
+    if (!res.ok) throw new Error('Error al exportar los enlaces');
+
+    const links = await res.json();
+    const count = Array.isArray(links) ? links.length : 0;
+
+    if (count === 0) {
+      showToast('Tu cuenta no tiene enlaces guardados para descargar aún', 'error');
+      return;
+    }
+
+    const dataStr = JSON.stringify(links, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+
+    const safeUser = (AppState.user?.email || 'links').replace(/[^a-zA-Z0-9]/g, '_');
+    const today = new Date().toISOString().slice(0, 10);
+    const fileName = `linkvault_${safeUser}_${today}.json`;
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    showToast(`¡Descarga completada! (${count} enlace${count === 1 ? '' : 's'} exportados)`, 'success');
+  } catch (err) {
+    console.error('Error al descargar JSON:', err);
+    showToast('No se pudo descargar el archivo JSON', 'error');
+  }
+}
+
+// ==========================================================
+// ANIMACIONES VISUALES MODERNAS CON GSAP
+// ==========================================================
+function initLoginAnimation() {
+  if (typeof gsap === 'undefined') return;
+
+  // Detener posibles animaciones previas
+  gsap.killTweensOf(['.login-card', '.login-logo-wrapper', '.hero-float-1', '.hero-float-2', '.hero-float-3', '.login-orb-1', '.login-orb-2', '.login-orb-3']);
+
+  // 1. Estado inicial
+  gsap.set('.login-card', { opacity: 0, y: 35, scale: 0.94 });
+  gsap.set('.login-logo-wrapper', { scale: 0.5, rotation: -15, opacity: 0 });
+  gsap.set('.login-tag', { opacity: 0, y: -10 });
+  gsap.set('.login-title', { opacity: 0, y: 18 });
+  gsap.set('.login-subtitle', { opacity: 0, y: 15 });
+  gsap.set('.login-auth-box', { opacity: 0, y: 20 });
+  gsap.set('.hero-float-1', { opacity: 0, x: -40, y: 20 });
+  gsap.set('.hero-float-2', { opacity: 0, x: 40, y: -20 });
+  gsap.set('.hero-float-3', { opacity: 0, y: 35 });
+
+  // 2. Animación ambiental continua de los orbes
+  gsap.to('.login-orb-1', {
+    scale: 1.25,
+    x: 35,
+    y: -30,
+    duration: 8,
+    repeat: -1,
+    yoyo: true,
+    ease: 'sine.inOut'
+  });
+  gsap.to('.login-orb-2', {
+    scale: 1.3,
+    x: -35,
+    y: 35,
+    duration: 9,
+    repeat: -1,
+    yoyo: true,
+    ease: 'sine.inOut',
+    delay: 0.8
+  });
+  gsap.to('.login-orb-3', {
+    scale: 1.2,
+    duration: 10,
+    repeat: -1,
+    yoyo: true,
+    ease: 'sine.inOut',
+    delay: 1.5
+  });
+
+  // 3. Línea de tiempo de entrada de la tarjeta
+  const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+  tl.to('.login-card', { opacity: 1, y: 0, scale: 1, duration: 0.8 })
+    .to('.login-logo-wrapper', { opacity: 1, scale: 1, rotation: 0, duration: 0.7, ease: 'back.out(2)' }, '-=0.5')
+    .to('.login-tag', { opacity: 1, y: 0, duration: 0.4 }, '-=0.4')
+    .to('.login-title', { opacity: 1, y: 0, duration: 0.5 }, '-=0.3')
+    .to('.login-subtitle', { opacity: 1, y: 0, duration: 0.5 }, '-=0.35')
+    .to('.login-auth-box', { opacity: 1, y: 0, duration: 0.6 }, '-=0.3')
+    .to(['.hero-float-1', '.hero-float-2', '.hero-float-3'], {
+      opacity: 1,
+      x: 0,
+      y: 0,
+      stagger: 0.15,
+      duration: 0.8,
+      ease: 'back.out(1.4)'
+    }, '-=0.5');
+
+  // 4. Movimiento flotante continuo tipo levitación
+  gsap.to('.hero-float-1', {
+    y: '-=16',
+    rotation: 1.8,
+    duration: 3.6,
+    repeat: -1,
+    yoyo: true,
+    ease: 'sine.inOut'
+  });
+  gsap.to('.hero-float-2', {
+    y: '+=18',
+    rotation: -2,
+    duration: 4.2,
+    repeat: -1,
+    yoyo: true,
+    ease: 'sine.inOut',
+    delay: 0.4
+  });
+  gsap.to('.hero-float-3', {
+    y: '-=12',
+    x: '+=8',
+    duration: 3.8,
+    repeat: -1,
+    yoyo: true,
+    ease: 'sine.inOut',
+    delay: 0.8
+  });
+}
+
+function animateTransitionToDashboard(callback) {
+  if (typeof gsap === 'undefined') {
+    document.getElementById('login-view')?.classList.add('hidden');
+    document.getElementById('app-dashboard')?.classList.remove('hidden');
+    if (callback) callback();
+    return;
+  }
+
+  const tl = gsap.timeline();
+  tl.to('.login-card', {
+    scale: 0.92,
+    opacity: 0,
+    y: -30,
+    duration: 0.4,
+    ease: 'power2.in'
+  })
+  .to(['.hero-float-1', '.hero-float-2', '.hero-float-3'], {
+    opacity: 0,
+    scale: 0.85,
+    duration: 0.3,
+    stagger: 0.05
+  }, '-=0.3')
+  .to('#login-view', {
+    opacity: 0,
+    duration: 0.3,
+    onComplete: () => {
+      document.getElementById('login-view')?.classList.add('hidden');
+      const dashboard = document.getElementById('app-dashboard');
+      if (dashboard) {
+        dashboard.classList.remove('hidden');
+        gsap.fromTo(dashboard, { opacity: 0, y: 25 }, { opacity: 1, y: 0, duration: 0.5, ease: 'power3.out' });
+        gsap.from('.app-header', { y: -30, opacity: 0, duration: 0.5, ease: 'power3.out' });
+        gsap.from('.search-section', { opacity: 0, scale: 0.97, duration: 0.4, delay: 0.1 });
+        gsap.from('.categories-scroll-wrapper', { opacity: 0, x: -20, duration: 0.4, delay: 0.2 });
+      }
+      if (callback) callback();
+    }
+  });
+}
+
+function animateTransitionToLogin() {
+  const dashboard = document.getElementById('app-dashboard');
+  const loginView = document.getElementById('login-view');
+  if (!dashboard || !loginView) return;
+
+  if (typeof gsap === 'undefined') {
+    dashboard.classList.add('hidden');
+    loginView.classList.remove('hidden');
+    return;
+  }
+
+  gsap.to(dashboard, {
+    opacity: 0,
+    y: 20,
+    duration: 0.35,
+    ease: 'power2.in',
+    onComplete: () => {
+      dashboard.classList.add('hidden');
+      loginView.classList.remove('hidden');
+      gsap.set(loginView, { opacity: 1 });
+      initLoginAnimation();
+    }
+  });
+}
+
+// ==========================================================
+// REGISTRO DE EVENTOS DE INTERFAZ
+// ==========================================================
 function initEventListeners() {
+  // 0. Acciones de Autenticación
+  document.getElementById('btn-quick-login-alfonso')?.addEventListener('click', () => {
+    handleDevLogin('alfonso.segoviam@gmail.com', 'Alfonso Segovia');
+  });
+
+  document.getElementById('btn-custom-google-login')?.addEventListener('click', () => {
+    if (AppState.googleConfig?.googleClientId && window.google?.accounts?.id) {
+      google.accounts.id.prompt();
+    } else {
+      // Si aún no se configuró GOOGLE_CLIENT_ID, dar acceso con el propietario principal
+      handleDevLogin('alfonso.segoviam@gmail.com', 'Alfonso Segovia');
+    }
+  });
+
+  const toggleCustomBtn = document.getElementById('btn-toggle-custom-email');
+  const customBox = document.getElementById('custom-email-box');
+  toggleCustomBtn?.addEventListener('click', () => {
+    customBox?.classList.toggle('hidden');
+  });
+
+  document.getElementById('btn-submit-custom-email')?.addEventListener('click', () => {
+    const input = document.getElementById('input-custom-email');
+    const email = (input?.value || '').trim();
+    if (!email || !email.includes('@')) {
+      showToast('Introduce un correo electrónico válido', 'error');
+      return;
+    }
+    handleDevLogin(email);
+  });
+
+  // Perfil de Usuario y Logout
+  const userProfileMenu = document.getElementById('user-profile-menu');
+  const userProfileBtn = document.getElementById('user-profile-btn');
+  const userDropdown = document.getElementById('user-dropdown-menu');
+
+  userProfileBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    userProfileMenu?.classList.toggle('open');
+    userDropdown?.classList.toggle('hidden');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!userProfileMenu?.contains(e.target)) {
+      userProfileMenu?.classList.remove('open');
+      userDropdown?.classList.add('hidden');
+    }
+  });
+
+  document.getElementById('btn-logout')?.addEventListener('click', () => {
+    userProfileMenu?.classList.remove('open');
+    userDropdown?.classList.add('hidden');
+    logout(true);
+  });
+
   // 1. Botones de Abrir Modal de Captura
   document.getElementById('btn-quick-add-desktop')?.addEventListener('click', () => openEditorModal());
   document.getElementById('btn-quick-add-mobile')?.addEventListener('click', () => openEditorModal());
@@ -121,6 +604,12 @@ function initEventListeners() {
     loadLinks();
   });
 
+  document.getElementById('btn-toggle-favorites-filter')?.addEventListener('click', function() {
+    AppState.isFavoritesOnly = !AppState.isFavoritesOnly;
+    this.classList.toggle('active', AppState.isFavoritesOnly);
+    loadLinks();
+  });
+
   // 9. Barra de Navegación Inferior (Móvil)
   document.getElementById('nav-home')?.addEventListener('click', () => {
     setActiveNav('nav-home');
@@ -138,7 +627,6 @@ function initEventListeners() {
 
   document.getElementById('nav-categories')?.addEventListener('click', () => {
     setActiveNav('nav-categories');
-    // Desplazar suavemente a los pills de categorías
     document.querySelector('.categories-scroll-wrapper')?.scrollIntoView({ behavior: 'smooth' });
   });
 
@@ -159,6 +647,20 @@ function initEventListeners() {
     if (e.target.files && e.target.files[0]) {
       handleRestoreDatabase(e.target.files[0]);
     }
+  });
+
+  // 12. Botones para Descargar Base de Enlaces en JSON
+  document.getElementById('btn-header-export-json')?.addEventListener('click', downloadLinksJson);
+  document.getElementById('btn-quick-export-json')?.addEventListener('click', downloadLinksJson);
+  document.getElementById('btn-dropdown-export-json')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    userProfileMenu?.classList.remove('open');
+    userDropdown?.classList.add('hidden');
+    downloadLinksJson();
+  });
+  document.getElementById('btn-download-json')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    downloadLinksJson();
   });
 
   uploadZone?.addEventListener('dragover', (e) => {
@@ -193,13 +695,12 @@ function resetCategoryPillsUI() {
 // ==========================================================
 // CONSUMO DE API Y GESTIÓN DE ENLACES
 // ==========================================================
-
 async function loadLinks() {
+  if (!AppState.token) return;
+
   const container = document.getElementById('links-grid');
   const emptyState = document.getElementById('empty-state');
-  const resultsText = document.getElementById('results-count-text');
-
-  if (resultsText) resultsText.textContent = 'Actualizando enlaces...';
+  const resultsCounter = document.getElementById('total-results-count');
 
   try {
     const params = new URLSearchParams();
@@ -210,18 +711,17 @@ async function loadLinks() {
     if (AppState.isFavoritesOnly) params.append('isFavorite', '1');
     if (AppState.sort) params.append('sort', AppState.sort);
 
-    const res = await fetch(`/api/links?${params.toString()}`);
-    if (!res.ok) throw new Error('Error en el servidor');
+    const res = await authFetch(`/api/links?${params.toString()}`);
+    if (!res.ok) throw new Error('Error al consultar enlaces');
     
     const links = await res.json();
     AppState.links = links;
 
     renderLinks(links);
-    updateResultsCount(links.length);
+    if (resultsCounter) resultsCounter.textContent = links.length;
     loadStats(); // refrescar contadores en los chips
   } catch (err) {
     console.error('Error cargando enlaces:', err);
-    showToast('No se pudieron cargar los enlaces', 'error');
   }
 }
 
@@ -235,20 +735,6 @@ function renderLinks(links) {
   if (links.length === 0) {
     emptyState.classList.remove('hidden');
     container.classList.add('hidden');
-
-    const emptyTitle = document.getElementById('empty-title');
-    const emptyDesc = document.getElementById('empty-description');
-
-    if (AppState.isFavoritesOnly) {
-      if (emptyTitle) emptyTitle.textContent = 'Sin favoritos guardados';
-      if (emptyDesc) emptyDesc.textContent = 'Marca cualquier enlace con la estrella ⭐ para encontrarlo rápidamente aquí.';
-    } else if (AppState.searchTerm || AppState.activeCategory !== 'all') {
-      if (emptyTitle) emptyTitle.textContent = 'Sin coincidencias';
-      if (emptyDesc) emptyDesc.textContent = 'No encontramos enlaces que coincidan con los filtros seleccionados.';
-    } else {
-      if (emptyTitle) emptyTitle.textContent = 'Tu LinkVault está vacío';
-      if (emptyDesc) emptyDesc.textContent = 'Guarda videos, noticias, eventos o páginas web. Se analizarán y resumirán de forma automática.';
-    }
     return;
   }
 
@@ -259,6 +745,17 @@ function renderLinks(links) {
     const card = createLinkCardElement(link);
     container.appendChild(card);
   });
+
+  // Animación de entrada de las tarjetas con GSAP
+  if (typeof gsap !== 'undefined') {
+    gsap.from('.link-card', {
+      opacity: 0,
+      y: 18,
+      duration: 0.35,
+      stagger: 0.04,
+      ease: 'power2.out'
+    });
+  }
 }
 
 function createLinkCardElement(link) {
@@ -266,106 +763,120 @@ function createLinkCardElement(link) {
   card.className = 'link-card';
   card.id = `link-card-${link.id}`;
 
-  const sourceName = link.source || 'Web';
-  const sourceClass = getSourceBadgeClass(sourceName);
-  const sourceIcon = PLATFORM_ICONS[sourceName] || PLATFORM_ICONS['Web'];
-
   const typeInfo = TYPE_LABELS[link.content_type] || { label: 'Web', icon: '🌐' };
-  const catClass = getCategoryBadgeClass(link.category);
+  const sourceIcon = PLATFORM_ICONS[link.source] || PLATFORM_ICONS['Web'];
+  const sourceClass = getSourceBadgeClass(link.source);
+  const categoryClass = getCategoryBadgeClass(link.category);
 
-  // Fecha amigable
-  let dateDisplay = '';
+  // Formato de fecha amigable
+  let formattedDate = '';
   try {
     const d = new Date(link.created_at);
-    dateDisplay = d.toLocaleDateString('es-ES', { month: 'short', day: 'numeric' });
-  } catch {
-    dateDisplay = '';
-  }
-
-  // Miniatura o placeholder estilizado
-  let thumbHtml = '';
-  if (link.thumbnail) {
-    thumbHtml = `
-      <div class="link-thumb-container">
-        <img src="${escapeHtml(link.thumbnail)}" alt="${escapeHtml(link.title)}" class="link-thumb-img" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'link-thumb-placeholder\\'>${typeInfo.icon}</div>';">
-      </div>
-    `;
-  } else {
-    thumbHtml = `
-      <div class="link-thumb-container">
-        <div class="link-thumb-placeholder">
-          <span style="font-size: 1.6rem;">${typeInfo.icon}</span>
-        </div>
-      </div>
-    `;
+    formattedDate = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+  } catch (e) {
+    formattedDate = '';
   }
 
   card.innerHTML = `
-    <div class="link-card-top">
-      <div class="link-badges">
-        <span class="badge-source ${sourceClass}" title="Origen: ${escapeHtml(sourceName)}">
+    <!-- Cabecera de la tarjeta con Badges -->
+    <div class="card-meta-top">
+      <div class="card-badges-left">
+        <span class="badge-source ${sourceClass}">
           ${sourceIcon}
-          <span>${escapeHtml(sourceName)}</span>
+          <span>${escapeHtml(link.source || 'Web')}</span>
         </span>
-        <span class="badge badge-type">
+        <span class="badge-content-type">
           ${typeInfo.icon} ${typeInfo.label}
         </span>
-        <span class="badge badge-cat ${catClass}">
+        <span class="badge-category ${categoryClass}">
           ${escapeHtml(link.category || 'Otro')}
         </span>
       </div>
-      <button class="btn-fav ${link.is_favorite ? 'active' : ''}" data-id="${link.id}" title="${link.is_favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="${link.is_favorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+
+      <button class="btn-fav ${link.is_favorite ? 'active' : ''}" title="Alternar Favorito" data-id="${link.id}">
+        <svg viewBox="0 0 24 24" fill="${link.is_favorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
         </svg>
       </button>
     </div>
 
-    <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" class="link-title-link" title="${escapeHtml(link.title)}">
-      ${escapeHtml(link.title)}
-    </a>
-
-    ${link.is_fallback ? `
-      <div class="fallback-indicator" title="Acceso directo restringido en la plataforma">
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-        <span>Lectura básica (acceso restringido)</span>
+    <!-- Miniatura opcional -->
+    ${link.thumbnail ? `
+      <div class="card-thumbnail-wrapper">
+        <img src="${escapeHtml(link.thumbnail)}" alt="Miniatura" loading="lazy" onerror="this.parentElement.style.display='none'">
       </div>
     ` : ''}
 
-    <div class="link-card-body">
-      ${thumbHtml}
-      <p class="link-summary-text">${escapeHtml(link.summary || 'Sin resumen disponible.')}</p>
+    <!-- Cuerpo del contenido -->
+    <div class="card-body">
+      <h3 class="card-title">
+        <a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" class="card-title-link">
+          ${escapeHtml(link.title || 'Sin título')}
+        </a>
+      </h3>
+
+      ${link.summary ? `
+        <div class="card-summary">
+          <span class="summary-label">Resumen:</span>
+          <p class="summary-text">${escapeHtml(link.summary)}</p>
+        </div>
+      ` : ''}
+
+      ${link.notes ? `
+        <div class="card-notes">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+          </svg>
+          <span>${escapeHtml(link.notes)}</span>
+        </div>
+      ` : ''}
+
+      ${link.tags ? `
+        <div class="card-tags">
+          ${link.tags.split(',').filter(Boolean).map(tag => `
+            <span class="tag-pill">#${escapeHtml(tag.trim())}</span>
+          `).join('')}
+        </div>
+      ` : ''}
     </div>
 
-    ${link.notes ? `
-      <div class="user-notes-snippet" title="Tus notas personales">
-        💬 "${escapeHtml(link.notes)}"
-      </div>
-    ` : ''}
+    <!-- Pie de la Tarjeta con acciones rápidas -->
+    <div class="card-footer">
+      <span class="card-date">${formattedDate}</span>
 
-    <div class="link-card-footer">
-      <span class="link-date-tag">📅 ${dateDisplay}</span>
       <div class="card-actions">
-        <button class="btn-card-action btn-copy-url" data-url="${escapeHtml(link.url)}" title="Copiar enlace">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+        <button class="btn-card-action btn-copy-link" title="Copiar enlace directo" data-url="${escapeHtml(link.url)}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
         </button>
-        <button class="btn-card-action btn-edit-link" data-id="${link.id}" title="Editar">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+
+        <button class="btn-card-action btn-edit-link" title="Editar enlace" data-id="${link.id}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
         </button>
-        <button class="btn-card-action btn-delete btn-delete-link" data-id="${link.id}" title="Eliminar">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+
+        <button class="btn-card-action btn-delete-link" title="Eliminar de mi bóveda" data-id="${link.id}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
         </button>
       </div>
     </div>
   `;
 
-  // Asignar manejadores a los botones de la tarjeta
+  // Asignar eventos de la tarjeta
   card.querySelector('.btn-fav')?.addEventListener('click', (e) => {
     e.stopPropagation();
     handleToggleFavorite(link.id);
   });
 
-  card.querySelector('.btn-copy-url')?.addEventListener('click', (e) => {
+  card.querySelector('.btn-copy-link')?.addEventListener('click', (e) => {
     e.stopPropagation();
     copyToClipboard(link.url);
   });
@@ -383,24 +894,14 @@ function createLinkCardElement(link) {
   return card;
 }
 
-function updateResultsCount(count) {
-  const el = document.getElementById('results-count-text');
-  if (!el) return;
-
-  if (count === 1) {
-    el.textContent = '1 enlace encontrado';
-  } else {
-    el.textContent = `${count} enlaces encontrados`;
-  }
-}
-
 async function loadStats() {
+  if (!AppState.token) return;
+
   try {
-    const res = await fetch('/api/stats');
+    const res = await authFetch('/api/stats');
     if (!res.ok) return;
     const stats = await res.json();
 
-    // Actualizar conteos en pills
     const allEl = document.getElementById('count-all');
     if (allEl) allEl.textContent = stats.total || '0';
 
@@ -421,27 +922,35 @@ async function loadStats() {
     setCatCount('count-salud', 'Salud');
     setCatCount('count-ejercicios', 'Ejercicios');
     setCatCount('count-tecnologia', 'Tecnología');
+    setCatCount('count-entretenimiento', 'Entretenimiento');
     setCatCount('count-vida-saludable', 'Vida Saludable');
     setCatCount('count-desarrollo-personal', 'Desarrollo Personal');
     setCatCount('count-desarrollo-software', 'Desarrollo de Software');
-    setCatCount('count-entretenimiento', 'Entretenimiento');
     setCatCount('count-otro', 'Otro');
 
-    // Estadísticas de la base de datos modal
-    const dbTotal = document.getElementById('db-stat-total');
-    const dbFavs = document.getElementById('db-stat-favs');
-    if (dbTotal) dbTotal.textContent = stats.total || '0';
-    if (dbFavs) dbFavs.textContent = stats.favorites || '0';
+    // Modal de estadísticas
+    const totalModal = document.getElementById('db-stat-total');
+    const favsModal = document.getElementById('db-stat-favs');
+    const engineModal = document.getElementById('db-stat-engine');
 
-  } catch (e) {
-    console.warn('Error cargando estadísticas:', e);
+    if (totalModal) totalModal.textContent = stats.total || '0';
+    if (favsModal) favsModal.textContent = stats.favorites || '0';
+    if (engineModal) engineModal.textContent = stats.isCloud ? 'Turso Cloud' : 'SQLite Local';
+
+    const engineTitle = document.getElementById('db-engine-title');
+    if (engineTitle) {
+      engineTitle.textContent = stats.isCloud 
+        ? `Turso Cloud SQLite (${stats.userEmail || ''})` 
+        : `SQLite Local (${stats.userEmail || ''})`;
+    }
+  } catch (err) {
+    console.warn('Error cargando estadísticas:', err);
   }
 }
 
 // ==========================================================
-// MODAL DE CAPTURA Y ANÁLISIS AUTOMÁTICO
+// MODAL DE CREACIÓN / EDICIÓN DE ENLACES
 // ==========================================================
-
 function openEditorModal(existingLink = null) {
   const modal = document.getElementById('modal-link-editor');
   const modalHeading = document.getElementById('modal-heading');
@@ -450,17 +959,15 @@ function openEditorModal(existingLink = null) {
   const fallbackAlert = document.getElementById('fallback-alert');
   const loader = document.getElementById('analyze-loader');
 
-  // Resetear estados
   loader?.classList.add('hidden');
   fallbackAlert?.classList.add('hidden');
 
   if (existingLink) {
-    // Modo Edición
     AppState.currentEditingId = existingLink.id;
     if (modalHeading) modalHeading.textContent = 'Editar Enlace';
     if (inputUrl) {
       inputUrl.value = existingLink.url;
-      inputUrl.disabled = true; // no cambiar URL en edición para preservar identidad
+      inputUrl.disabled = true;
     }
     if (btnAnalyze) btnAnalyze.style.display = 'none';
 
@@ -470,15 +977,16 @@ function openEditorModal(existingLink = null) {
       source: existingLink.source,
       content_type: existingLink.content_type,
       category: existingLink.category,
-      thumbnail: existingLink.thumbnail,
-      author: existingLink.author,
       notes: existingLink.notes,
       tags: existingLink.tags,
+      thumbnail: existingLink.thumbnail,
       is_favorite: existingLink.is_favorite,
       is_fallback: existingLink.is_fallback
     });
+
+    const saveBtn = document.getElementById('btn-save-link');
+    if (saveBtn) saveBtn.disabled = false;
   } else {
-    // Modo Nuevo
     AppState.currentEditingId = null;
     if (modalHeading) modalHeading.textContent = 'Agregar Nuevo Enlace';
     if (inputUrl) {
@@ -488,11 +996,13 @@ function openEditorModal(existingLink = null) {
     if (btnAnalyze) btnAnalyze.style.display = 'inline-flex';
 
     clearFormFields();
+    const saveBtn = document.getElementById('btn-save-link');
+    if (saveBtn) saveBtn.disabled = true;
   }
 
   modal?.classList.remove('hidden');
-  if (!existingLink && inputUrl) {
-    setTimeout(() => inputUrl.focus(), 150);
+  if (!existingLink) {
+    setTimeout(() => inputUrl?.focus(), 150);
   }
 }
 
@@ -510,7 +1020,6 @@ async function handlePasteClipboard() {
       if (text && inputUrl) {
         inputUrl.value = text.trim();
         showToast('Enlace pegado del portapapeles', 'success');
-        // Analizar automáticamente al pegar
         handleAnalyzeUrl();
       }
     } else {
@@ -540,7 +1049,7 @@ async function handleAnalyzeUrl() {
     if (btnAnalyzeText) btnAnalyzeText.textContent = 'Analizando...';
     fallbackAlert?.classList.add('hidden');
 
-    const res = await fetch('/api/analyze', {
+    const res = await authFetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url })
@@ -548,17 +1057,32 @@ async function handleAnalyzeUrl() {
 
     if (!res.ok) throw new Error('Error al conectar con el analizador');
 
-    const data = await res.json();
-    populateFormFields(data);
+    const meta = await res.json();
 
-    if (data.is_fallback) {
+    if (meta.is_fallback) {
       fallbackAlert?.classList.remove('hidden');
     }
 
-    showToast('Enlace analizado exitosamente', 'success');
+    populateFormFields({
+      title: meta.title,
+      summary: meta.summary,
+      source: meta.source,
+      content_type: meta.content_type,
+      category: meta.category,
+      thumbnail: meta.thumbnail,
+      tags: meta.tags || '',
+      is_fallback: meta.is_fallback ? 1 : 0
+    });
+
+    const saveBtn = document.getElementById('btn-save-link');
+    if (saveBtn) saveBtn.disabled = false;
+
+    showToast('Enlace clasificado y analizado correctamente', 'success');
   } catch (err) {
     console.error('Error al analizar:', err);
-    showToast('No se pudo analizar el enlace. Puedes completar los datos manualmente.', 'error');
+    showToast('No se pudo analizar el enlace automáticamente. Puedes completarlo manualmente.', 'error');
+    const saveBtn = document.getElementById('btn-save-link');
+    if (saveBtn) saveBtn.disabled = false;
   } finally {
     loader?.classList.add('hidden');
     if (btnAnalyzeText) btnAnalyzeText.textContent = 'Analizar';
@@ -566,34 +1090,38 @@ async function handleAnalyzeUrl() {
 }
 
 function populateFormFields(data) {
-  const titleInput = document.getElementById('edit-title');
-  const summaryInput = document.getElementById('edit-summary');
-  const contentTypeSelect = document.getElementById('edit-content-type');
-  const categorySelect = document.getElementById('edit-category');
-  const notesInput = document.getElementById('edit-notes');
-  const tagsInput = document.getElementById('edit-tags');
-  const favCheck = document.getElementById('edit-is-favorite');
+  const title = document.getElementById('edit-title');
+  const summary = document.getElementById('edit-summary');
+  const notes = document.getElementById('edit-notes');
+  const tags = document.getElementById('edit-tags');
+  const thumb = document.getElementById('edit-thumbnail');
+  const fav = document.getElementById('edit-is-favorite');
+  const contentType = document.getElementById('edit-content-type');
+  const category = document.getElementById('edit-category');
   const sourceBadge = document.getElementById('badge-detected-source');
-  const thumbHidden = document.getElementById('edit-thumbnail');
-  const authorHidden = document.getElementById('edit-author');
-  const fallbackHidden = document.getElementById('edit-is-fallback');
 
-  if (titleInput) titleInput.value = data.title || '';
-  if (summaryInput) summaryInput.value = data.summary || '';
-  if (contentTypeSelect && data.content_type) contentTypeSelect.value = data.content_type;
-  if (categorySelect && data.category) categorySelect.value = data.category;
-  if (notesInput) notesInput.value = data.notes || '';
-  if (tagsInput) tagsInput.value = data.tags || '';
-  if (favCheck) favCheck.checked = Boolean(data.is_favorite);
+  if (title) title.value = data.title || '';
+  if (summary) summary.value = data.summary || '';
+  if (notes) notes.value = data.notes || '';
+  if (tags) tags.value = data.tags || '';
+  if (thumb) thumb.value = data.thumbnail || '';
+  if (fav) fav.checked = Boolean(data.is_favorite);
 
-  if (thumbHidden) thumbHidden.value = data.thumbnail || '';
-  if (authorHidden) authorHidden.value = data.author || '';
-  if (fallbackHidden) fallbackHidden.value = data.is_fallback ? '1' : '0';
+  if (contentType && data.content_type) contentType.value = data.content_type;
+  if (category && data.category) category.value = data.category;
+  if (sourceBadge && data.source) {
+    sourceBadge.textContent = data.source;
+    sourceBadge.className = `badge-source ${getSourceBadgeClass(data.source)}`;
+  }
 
-  if (sourceBadge) {
-    const sName = data.source || 'Web';
-    sourceBadge.textContent = sName;
-    sourceBadge.className = `badge-source ${getSourceBadgeClass(sName)}`;
+  // Previsualización de imagen
+  const previewBox = document.getElementById('thumbnail-preview-box');
+  const previewImg = document.getElementById('img-preview');
+  if (data.thumbnail && previewBox && previewImg) {
+    previewImg.src = data.thumbnail;
+    previewBox.classList.remove('hidden');
+  } else if (previewBox) {
+    previewBox.classList.add('hidden');
   }
 }
 
@@ -607,7 +1135,6 @@ function clearFormFields() {
     notes: '',
     tags: '',
     thumbnail: '',
-    author: '',
     is_favorite: 0,
     is_fallback: 0
   });
@@ -624,8 +1151,6 @@ async function handleSaveLink() {
   const favCheck = document.getElementById('edit-is-favorite');
   const sourceBadge = document.getElementById('badge-detected-source');
   const thumbHidden = document.getElementById('edit-thumbnail');
-  const authorHidden = document.getElementById('edit-author');
-  const fallbackHidden = document.getElementById('edit-is-fallback');
   const saveBtn = document.getElementById('btn-save-link');
 
   const url = (inputUrl?.value || '').trim();
@@ -653,9 +1178,7 @@ async function handleSaveLink() {
     notes: notesInput?.value || '',
     tags: tagsInput?.value || '',
     thumbnail: thumbHidden?.value || '',
-    author: authorHidden?.value || '',
-    is_favorite: favCheck?.checked ? 1 : 0,
-    is_fallback: fallbackHidden?.value === '1' ? 1 : 0
+    is_favorite: favCheck?.checked ? 1 : 0
   };
 
   try {
@@ -663,24 +1186,22 @@ async function handleSaveLink() {
 
     let res;
     if (AppState.currentEditingId) {
-      // Actualizar
-      res = await fetch(`/api/links/${AppState.currentEditingId}`, {
+      res = await authFetch(`/api/links/${AppState.currentEditingId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
     } else {
-      // Crear
-      res = await fetch('/api/links', {
+      res = await authFetch('/api/links', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
     }
 
-    if (!res.ok) throw new Error('Error al guardar');
+    if (!res.ok) throw new Error('Error al guardar enlace');
 
-    showToast(AppState.currentEditingId ? 'Enlace actualizado' : 'Enlace guardado en SQLite', 'success');
+    showToast(AppState.currentEditingId ? 'Enlace actualizado' : 'Enlace guardado en tu bóveda', 'success');
     closeEditorModal();
     loadLinks();
   } catch (err) {
@@ -693,11 +1214,10 @@ async function handleSaveLink() {
 
 async function handleToggleFavorite(id) {
   try {
-    const res = await fetch(`/api/links/${id}/favorite`, { method: 'PATCH' });
+    const res = await authFetch(`/api/links/${id}/favorite`, { method: 'PATCH' });
     if (!res.ok) throw new Error('Error');
     const data = await res.json();
 
-    // Actualizar visualmente la tarjeta si está presente
     const btnFav = document.querySelector(`#link-card-${id} .btn-fav`);
     if (btnFav) {
       btnFav.classList.toggle('active', Boolean(data.is_favorite));
@@ -707,7 +1227,6 @@ async function handleToggleFavorite(id) {
       }
     }
 
-    // Si estamos en la pestaña de favoritos y se desmarcó, recargar la lista
     if (AppState.isFavoritesOnly && !data.is_favorite) {
       loadLinks();
     } else {
@@ -719,10 +1238,10 @@ async function handleToggleFavorite(id) {
 }
 
 async function handleDeleteLink(id, title) {
-  if (!confirm(`¿Eliminar el enlace "${title}" de la base de datos?`)) return;
+  if (!confirm(`¿Eliminar el enlace "${title}" de tu bóveda?`)) return;
 
   try {
-    const res = await fetch(`/api/links/${id}`, { method: 'DELETE' });
+    const res = await authFetch(`/api/links/${id}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('Error al eliminar');
 
     showToast('Enlace eliminado', 'success');
@@ -735,15 +1254,15 @@ async function handleDeleteLink(id, title) {
 // ==========================================================
 // MODAL DE BASE DE DATOS Y RESTAURACIÓN
 // ==========================================================
-
 function openDatabaseModal() {
-  const modal = document.getElementById('modal-database');
+  const modal = document.getElementById('modal-db-manager');
   modal?.classList.remove('hidden');
+  updateExportLinks();
   loadStats();
 }
 
 function closeDatabaseModal() {
-  const modal = document.getElementById('modal-database');
+  const modal = document.getElementById('modal-db-manager');
   modal?.classList.add('hidden');
 }
 
@@ -759,34 +1278,16 @@ async function handleRestoreDatabase(file) {
   }
 
   if (isDb) {
-    if (!confirm('¿Deseas restaurar esta base de datos SQLite? Se reemplazarán los datos actuales con el archivo cargado.')) return;
+    showToast('La importación de archivos .db está restringida para preservar el aislamiento de cuentas. Utiliza la opción de archivo .json.', 'error');
+    return;
+  }
 
-    const formData = new FormData();
-    formData.append('database', file);
-
-    try {
-      showToast('Restaurando base de datos SQLite...', 'success');
-      const res = await fetch('/api/import/db', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Error restaurando');
-
-      showToast('Base de datos SQLite restaurada correctamente', 'success');
-      closeDatabaseModal();
-      loadLinks();
-    } catch (err) {
-      console.error('Error restaurando DB:', err);
-      showToast(err.message || 'Fallo al restaurar la base de datos', 'error');
-    }
-  } else if (isJson) {
+  if (isJson) {
     try {
       const text = await file.text();
       const items = JSON.parse(text);
 
-      const res = await fetch('/api/import/json', {
+      const res = await authFetch('/api/import/json', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(items)
@@ -795,7 +1296,7 @@ async function handleRestoreDatabase(file) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Error importando');
 
-      showToast(data.message || 'Enlaces importados correctamente', 'success');
+      showToast(data.message || 'Enlaces importados correctamente a tu cuenta', 'success');
       closeDatabaseModal();
       loadLinks();
     } catch (err) {
@@ -807,7 +1308,6 @@ async function handleRestoreDatabase(file) {
 // ==========================================================
 // UTILIDADES: CLASES CSS, DEBOUNCE, PORTAPAPELES, TOASTS
 // ==========================================================
-
 function getSourceBadgeClass(sourceName) {
   const s = (sourceName || '').toLowerCase();
   if (s.includes('youtube')) return 'badge-youtube';

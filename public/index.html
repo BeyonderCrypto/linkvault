@@ -11,6 +11,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   
+  <!-- GSAP (GreenSock Animation Platform) para animaciones avanzadas y fluidas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <!-- Google Identity Services (GIS) para inicio de sesión seguro con Google -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  
   <link rel="stylesheet" href="css/styles.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'><path d='M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z'/></svg>">
 </head>
@@ -19,223 +25,412 @@
   <div class="bg-glow bg-glow-1"></div>
   <div class="bg-glow bg-glow-2"></div>
 
-  <!-- Header Superior -->
-  <header class="app-header">
-    <div class="header-container">
-      <div class="brand">
-        <div class="brand-logo">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-          </svg>
+  <!-- ============================================================== -->
+  <!-- PANTALLA INICIAL DE LOGUEO (ANIMADA CON GSAP)                  -->
+  <!-- ============================================================== -->
+  <div id="login-view" class="login-view">
+    <div class="login-backdrop">
+      <div class="login-orb login-orb-1"></div>
+      <div class="login-orb login-orb-2"></div>
+      <div class="login-orb login-orb-3"></div>
+      <div class="login-grid-pattern"></div>
+    </div>
+
+    <!-- Elementos Flotantes Decorativos animados con GSAP -->
+    <div class="login-floating-elements">
+      <!-- Tarjeta Flotante 1: YouTube / Video -->
+      <div class="float-card hero-float-1">
+        <div class="float-card-header">
+          <span class="float-badge float-badge-yt">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+            YouTube
+          </span>
+          <span class="float-pill">Educativo</span>
         </div>
-        <div class="brand-info">
-          <h1 class="brand-title">LinkVault</h1>
-          <span class="brand-subtitle">Base de Datos Portable (SQLite)</span>
+        <div class="float-title">Full Course Tutorial 2026</div>
+        <div class="float-desc">✨ Resumen automático generado con IA</div>
+      </div>
+
+      <!-- Tarjeta Flotante 2: Base de Datos Turso & SQLite -->
+      <div class="float-card hero-float-2">
+        <div class="float-card-icon">⚡</div>
+        <div class="float-text-group">
+          <strong>Turso Cloud & SQLite</strong>
+          <span>Datos sincronizados por usuario</span>
         </div>
       </div>
 
-      <div class="header-actions">
-        <button id="btn-open-db-modal" class="btn btn-secondary btn-icon-text" title="Gestionar Base de Datos">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
-          </svg>
-          <span class="btn-label-desktop">Base de Datos</span>
-        </button>
+      <!-- Tarjeta Flotante 3: Privacidad & Multi-usuario -->
+      <div class="float-card hero-float-3">
+        <div class="float-card-icon">🔐</div>
+        <div class="float-text-group">
+          <strong>Bóveda Privada Personal</strong>
+          <span>Acceso exclusivo con Google Auth</span>
+        </div>
+      </div>
+    </div>
 
-        <button id="btn-quick-add-desktop" class="btn btn-primary btn-icon-text">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+    <!-- Contenedor Central de Logueo -->
+    <div class="login-card-container">
+      <div class="login-card">
+        <!-- Brand Logo animado -->
+        <div class="login-logo-wrapper">
+          <div class="login-logo-pulse"></div>
+          <div class="login-logo-box">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            </svg>
+          </div>
+        </div>
+
+        <div class="login-tag">
+          <span class="login-sparkle">✦</span> Bóveda Inteligente de Enlaces
+        </div>
+
+        <h1 class="login-title">
+          Bienvenido a <span class="gradient-text">LinkVault</span>
+        </h1>
+
+        <p class="login-subtitle">
+          Inicia sesión para acceder a tu bóveda personal. Clasifica, resume y organiza tus enlaces de YouTube, redes sociales y artículos en Turso Cloud & SQLite.
+        </p>
+
+        <!-- Contenedor de Autenticación -->
+        <div class="login-auth-box">
+          <!-- Botón de Google Identity Services renderizado por Google -->
+          <div id="g_id_signin_container" class="g-signin-wrapper"></div>
+
+          <!-- Botón de respaldo/interactivo con diseño Google -->
+          <button id="btn-custom-google-login" class="btn-google-custom">
+            <svg class="google-icon" viewBox="0 0 24 24" width="20" height="20">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <span id="btn-google-text">Iniciar sesión con Google</span>
+          </button>
+
+          <!-- Acceso Directo / Pruebas Locales -->
+          <div id="dev-auth-helper" class="dev-auth-helper">
+            <div class="dev-auth-divider"><span>O ACCESO DIRECTO RÁPIDO</span></div>
+            <button id="btn-quick-login-alfonso" class="btn-dev-quick">
+              <span class="dev-user-icon">👤</span>
+              <span class="dev-user-text">
+                Continuar como <strong>alfonso.segoviam@gmail.com</strong>
+                <small class="dev-subtext">Ver enlaces vinculados de Turso Cloud</small>
+              </span>
+            </button>
+            <button id="btn-toggle-custom-email" class="btn-link-subtle">
+              ¿Deseas probar con otro usuario de prueba?
+            </button>
+            <div id="custom-email-box" class="custom-email-box hidden">
+              <input type="email" id="input-custom-email" placeholder="otro_usuario@gmail.com" class="custom-email-input">
+              <button id="btn-submit-custom-email" class="btn btn-secondary btn-sm">Acceder</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="login-footer-info">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+          <span>Cada usuario accede únicamente a sus propios enlaces privados.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- DASHBOARD PRINCIPAL DE LA APLICACIÓN (VISTA AUTENTICADA)       -->
+  <!-- ============================================================== -->
+  <div id="app-dashboard" class="app-dashboard hidden">
+    
+    <!-- Header Superior -->
+    <header class="app-header">
+      <div class="header-container">
+        <div class="brand">
+          <div class="brand-logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            </svg>
+          </div>
+          <div class="brand-info">
+            <h1 class="brand-title">LinkVault</h1>
+            <span class="brand-subtitle">Base de Datos Portable (SQLite & Turso)</span>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button id="btn-header-export-json" class="btn btn-secondary btn-icon-text" title="Descargar mi base de enlaces en JSON">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span class="btn-label-desktop">Descargar JSON</span>
+          </button>
+
+          <button id="btn-open-db-modal" class="btn btn-secondary btn-icon-text" title="Gestionar Base de Datos">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+            </svg>
+            <span class="btn-label-desktop">Base de Datos</span>
+          </button>
+
+          <button id="btn-quick-add-desktop" class="btn btn-primary btn-icon-text">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Nuevo Enlace</span>
+          </button>
+
+          <!-- Perfil de Usuario Autenticado -->
+          <div class="user-profile-menu" id="user-profile-menu">
+            <div class="user-profile-btn" id="user-profile-btn" title="Perfil y Sesión">
+              <img id="user-avatar" class="user-avatar" src="" alt="Avatar" style="display:none;">
+              <div id="user-avatar-placeholder" class="user-avatar-placeholder">AS</div>
+              <div class="user-info-text">
+                <span id="user-display-name" class="user-display-name">Alfonso Segovia</span>
+                <span id="user-display-email" class="user-display-email">alfonso.segoviam@gmail.com</span>
+              </div>
+              <svg class="chevron-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+            
+            <div class="user-dropdown-menu hidden" id="user-dropdown-menu">
+              <div class="user-dropdown-header">
+                <div id="dropdown-user-name" class="dropdown-user-name">Alfonso Segovia</div>
+                <div id="dropdown-user-email" class="dropdown-user-email">alfonso.segoviam@gmail.com</div>
+                <span class="badge-role">Sesión Activa</span>
+              </div>
+              <div class="dropdown-divider"></div>
+
+              <!-- Descarga rápida de JSON -->
+              <button id="btn-dropdown-export-json" class="dropdown-item" title="Descargar mis enlaces en formato JSON">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span>Descargar base (.json)</span>
+              </button>
+
+              <div class="dropdown-divider"></div>
+              <button id="btn-logout" class="dropdown-item btn-logout">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                  <polyline points="16 17 21 12 16 7"></polyline>
+                  <line x1="21" y1="12" x2="9" y2="12"></line>
+                </svg>
+                <span>Cerrar sesión</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Contenedor Principal -->
+    <main class="main-content">
+      
+      <!-- Barra de Búsqueda Rápida y Acceso Directo -->
+      <section class="search-section">
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="search-input" placeholder="Buscar por título, resumen, temática, notas o enlace..." autocomplete="off">
+          <button id="btn-clear-search" class="clear-icon hidden" title="Limpiar búsqueda">&times;</button>
+        </div>
+      </section>
+
+      <!-- Barra de Filtro de Categorías Deslizable -->
+      <section class="categories-scroll-wrapper">
+        <div class="categories-container" id="category-pills">
+          <button class="pill-chip active" data-category="all">
+            <span class="chip-icon">✨</span> Todos
+            <span class="chip-count" id="count-all">0</span>
+          </button>
+          <button class="pill-chip" data-category="Educativo">
+            <span class="chip-icon">📚</span> Educativo
+            <span class="chip-count" id="count-educativo">0</span>
+          </button>
+          <button class="pill-chip" data-category="Negocios">
+            <span class="chip-icon">💼</span> Negocios
+            <span class="chip-count" id="count-negocios">0</span>
+          </button>
+          <button class="pill-chip" data-category="Salud">
+            <span class="chip-icon">🩺</span> Salud
+            <span class="chip-count" id="count-salud">0</span>
+          </button>
+          <button class="pill-chip" data-category="Ejercicios">
+            <span class="chip-icon">🏋️</span> Ejercicios
+            <span class="chip-count" id="count-ejercicios">0</span>
+          </button>
+          <button class="pill-chip" data-category="Tecnología">
+            <span class="chip-icon">💻</span> Tecnología
+            <span class="chip-count" id="count-tecnologia">0</span>
+          </button>
+          <button class="pill-chip" data-category="Entretenimiento">
+            <span class="chip-icon">🎭</span> Entretenimiento
+            <span class="chip-count" id="count-entretenimiento">0</span>
+          </button>
+          <button class="pill-chip" data-category="Vida Saludable">
+            <span class="chip-icon">🌿</span> Vida Saludable
+            <span class="chip-count" id="count-vida-saludable">0</span>
+          </button>
+          <button class="pill-chip" data-category="Desarrollo Personal">
+            <span class="chip-icon">🌱</span> Desarrollo Personal
+            <span class="chip-count" id="count-desarrollo-personal">0</span>
+          </button>
+          <button class="pill-chip" data-category="Desarrollo de Software">
+            <span class="chip-icon">👨‍💻</span> Desarrollo de Software
+            <span class="chip-count" id="count-desarrollo-software">0</span>
+          </button>
+          <button class="pill-chip" data-category="Otro">
+            <span class="chip-icon">🌐</span> Otro
+            <span class="chip-count" id="count-otro">0</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Barra de Filtros Secundarios (Tipo, Fuente, Orden) -->
+      <section class="filter-controls-row">
+        <div class="filter-group">
+          <label for="filter-content-type" class="filter-label">Tipo:</label>
+          <select id="filter-content-type" class="filter-select">
+            <option value="all">Todos los tipos</option>
+            <option value="video">🎬 Videos</option>
+            <option value="evento">📅 Eventos</option>
+            <option value="articulo">📄 Artículos</option>
+            <option value="podcast">🎙️ Podcasts</option>
+            <option value="producto">🛍️ Productos</option>
+            <option value="web">🌐 Páginas Web</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-source" class="filter-label">Origen:</label>
+          <select id="filter-source" class="filter-select">
+            <option value="all">Todas las fuentes</option>
+            <option value="YouTube">YouTube</option>
+            <option value="TikTok">TikTok</option>
+            <option value="Instagram">Instagram</option>
+            <option value="Facebook">Facebook</option>
+            <option value="X / Twitter">X / Twitter</option>
+            <option value="LinkedIn">LinkedIn</option>
+            <option value="Web">Web General</option>
+          </select>
+        </div>
+
+        <div class="filter-group">
+          <label for="filter-sort" class="filter-label">Ordenar:</label>
+          <select id="filter-sort" class="filter-select">
+            <option value="newest">Más recientes</option>
+            <option value="oldest">Más antiguos</option>
+            <option value="title_asc">Título (A-Z)</option>
+            <option value="title_desc">Título (Z-A)</option>
+          </select>
+        </div>
+
+        <button id="btn-toggle-favorites-filter" class="btn-fav-filter" title="Mostrar solo favoritos">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+          <span>Solo Favoritos</span>
+        </button>
+      </section>
+
+      <!-- Lista de Enlaces en Tarjetas -->
+      <section class="links-section">
+        <div class="section-meta-header">
+          <h2 class="section-title">
+            <span id="active-category-title">Todos los Enlaces</span>
+            <span class="badge-counter" id="total-results-count">0</span>
+          </h2>
+
+          <button id="btn-quick-export-json" class="btn btn-secondary btn-sm btn-icon-text btn-export-accent" title="Descargar todos mis enlaces en un archivo JSON">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Descargar JSON</span>
+          </button>
+        </div>
+
+        <!-- Rejilla de Tarjetas -->
+        <div id="links-grid" class="links-grid">
+          <!-- Renderizado dinámico desde app.js -->
+        </div>
+
+        <!-- Estado Vacío -->
+        <div id="empty-state" class="empty-state hidden">
+          <div class="empty-icon-wrapper">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+            </svg>
+          </div>
+          <h3 class="empty-title">No hay enlaces guardados</h3>
+          <p class="empty-desc">Comienza agregando enlaces de YouTube, TikTok, conferencias o artículos web.</p>
+          <button id="btn-empty-add" class="btn btn-primary mt-3">Guardar mi Primer Enlace</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Barra de Navegación Móvil Inferior -->
+    <nav class="mobile-bottom-nav">
+      <button class="nav-item active" id="nav-home">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+          <polyline points="9 22 9 12 15 12 15 22"></polyline>
+        </svg>
+        <span>Inicio</span>
+      </button>
+
+      <button class="nav-item" id="nav-favorites">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+        <span>Favoritos</span>
+      </button>
+
+      <!-- Botón Central Flotante para Agregar Enlace -->
+      <div class="nav-center-action">
+        <button class="nav-fab-button" id="btn-quick-add-mobile" aria-label="Agregar enlace">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8">
             <line x1="12" y1="5" x2="12" y2="19"></line>
             <line x1="5" y1="12" x2="19" y2="12"></line>
           </svg>
-          <span>Nuevo Enlace</span>
         </button>
       </div>
-    </div>
-  </header>
 
-  <!-- Contenedor Principal -->
-  <main class="main-content">
-    
-    <!-- Barra de Búsqueda Rápida y Acceso Directo -->
-    <section class="search-section">
-      <div class="search-box">
-        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+      <button class="nav-item" id="nav-categories">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 6h16M4 12h16M4 18h7"></path>
         </svg>
-        <input type="text" id="search-input" placeholder="Buscar por título, resumen, temática, notas o enlace..." autocomplete="off">
-        <button id="btn-clear-search" class="clear-icon hidden" title="Limpiar búsqueda">&times;</button>
-      </div>
-    </section>
-
-    <!-- Barra de Filtro de Categorías Deslizable (Touch-friendly para móvil) -->
-    <section class="categories-scroll-wrapper">
-      <div class="categories-container" id="category-pills">
-        <button class="pill-chip active" data-category="all">
-          <span class="chip-icon">✨</span> Todos
-          <span class="chip-count" id="count-all">0</span>
-        </button>
-        <button class="pill-chip" data-category="Educativo">
-          <span class="chip-icon">📚</span> Educativo
-          <span class="chip-count" id="count-educativo">0</span>
-        </button>
-        <button class="pill-chip" data-category="Negocios">
-          <span class="chip-icon">💼</span> Negocios
-          <span class="chip-count" id="count-negocios">0</span>
-        </button>
-        <button class="pill-chip" data-category="Salud">
-          <span class="chip-icon">🩺</span> Salud
-          <span class="chip-count" id="count-salud">0</span>
-        </button>
-        <button class="pill-chip" data-category="Ejercicios">
-          <span class="chip-icon">🏋️</span> Ejercicios
-          <span class="chip-count" id="count-ejercicios">0</span>
-        </button>
-        <button class="pill-chip" data-category="Tecnología">
-          <span class="chip-icon">💻</span> Tecnología
-          <span class="chip-count" id="count-tecnologia">0</span>
-        </button>
-        <button class="pill-chip" data-category="Entretenimiento">
-          <span class="chip-icon">🎭</span> Entretenimiento
-          <span class="chip-count" id="count-entretenimiento">0</span>
-        </button>
-        <button class="pill-chip" data-category="Vida Saludable">
-          <span class="chip-icon">🌿</span> Vida Saludable
-          <span class="chip-count" id="count-vida-saludable">0</span>
-        </button>
-        <button class="pill-chip" data-category="Desarrollo Personal">
-          <span class="chip-icon">🌱</span> Desarrollo Personal
-          <span class="chip-count" id="count-desarrollo-personal">0</span>
-        </button>
-        <button class="pill-chip" data-category="Desarrollo de Software">
-          <span class="chip-icon">👨‍💻</span> Desarrollo de Software
-          <span class="chip-count" id="count-desarrollo-software">0</span>
-        </button>
-        <button class="pill-chip" data-category="Otro">
-          <span class="chip-icon">🌐</span> Otro
-          <span class="chip-count" id="count-otro">0</span>
-        </button>
-      </div>
-    </section>
-
-    <!-- Barra de Filtros Secundarios (Tipo, Fuente, Orden) -->
-    <section class="filter-controls-row">
-      <div class="filter-group">
-        <label for="filter-content-type" class="filter-label">Tipo:</label>
-        <select id="filter-content-type" class="filter-select">
-          <option value="all">Todos los tipos</option>
-          <option value="video">🎬 Videos</option>
-          <option value="evento">📅 Eventos</option>
-          <option value="articulo">📄 Artículos</option>
-          <option value="podcast">🎙️ Podcasts</option>
-          <option value="producto">🛍️ Productos</option>
-          <option value="web">🌐 Páginas Web</option>
-        </select>
-      </div>
-
-      <div class="filter-group">
-        <label for="filter-source" class="filter-label">Origen:</label>
-        <select id="filter-source" class="filter-select">
-          <option value="all">Todas las fuentes</option>
-          <option value="YouTube">YouTube</option>
-          <option value="TikTok">TikTok</option>
-          <option value="Instagram">Instagram</option>
-          <option value="Facebook">Facebook</option>
-          <option value="X / Twitter">X / Twitter</option>
-          <option value="LinkedIn">LinkedIn</option>
-          <option value="Web">Web General</option>
-        </select>
-      </div>
-
-      <div class="filter-group">
-        <label for="filter-sort" class="filter-label">Orden:</label>
-        <select id="filter-sort" class="filter-select">
-          <option value="newest">Más recientes</option>
-          <option value="oldest">Más antiguos</option>
-          <option value="title_asc">Título (A-Z)</option>
-        </select>
-      </div>
-    </section>
-
-    <!-- Contador de Resultados y Estado -->
-    <div class="results-header">
-      <div class="results-status">
-        <span id="results-count-text">Cargando enlaces...</span>
-      </div>
-      <div class="filter-tags-active" id="active-filters-container"></div>
-    </div>
-
-    <!-- Lista / Cuadrícula de Enlaces -->
-    <section id="links-grid" class="links-grid">
-      <!-- Se inyecta dinámicamente -->
-    </section>
-
-    <!-- Estado Vacío -->
-    <div id="empty-state" class="empty-state hidden">
-      <div class="empty-illustration">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <circle cx="12" cy="12" r="10"></circle>
-          <path d="M16 16s-1.5-2-4-2-4 2-4 2"></path>
-          <line x1="9" y1="9" x2="9.01" y2="9"></line>
-          <line x1="15" y1="9" x2="15.01" y2="9"></line>
-        </svg>
-      </div>
-      <h3 id="empty-title">No hay enlaces guardados</h3>
-      <p id="empty-description">Empieza pegando cualquier enlace de YouTube, TikTok, Instagram, noticias o eventos para clasificarlo automáticamente.</p>
-      <button id="btn-empty-add" class="btn btn-primary mt-3">
-        <span>+ Agregar mi primer enlace</span>
+        <span>Filtros</span>
       </button>
-    </div>
-  </main>
 
-  <!-- ============================================================== -->
-  <!-- BARRA DE NAVEGACIÓN INFERIOR PARA MÓVILES (BOTTOM NAV BAR)   -->
-  <!-- ============================================================== -->
-  <nav class="mobile-bottom-nav">
-    <button class="nav-item active" id="nav-home">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-      </svg>
-      <span>Inicio</span>
-    </button>
-
-    <button class="nav-item" id="nav-favorites">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-      </svg>
-      <span>Favoritos</span>
-    </button>
-
-    <!-- Botón Central Flotante para Agregar Enlace -->
-    <div class="nav-center-action">
-      <button class="nav-fab-button" id="btn-quick-add-mobile" aria-label="Agregar enlace">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8">
-          <line x1="12" y1="5" x2="12" y2="19"></line>
-          <line x1="5" y1="12" x2="19" y2="12"></line>
+      <button class="nav-item" id="nav-database">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
         </svg>
+        <span>Base Datos</span>
       </button>
-    </div>
-
-    <button class="nav-item" id="nav-categories">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M4 6h16M4 12h16M4 18h7"></path>
-      </svg>
-      <span>Filtros</span>
-    </button>
-
-    <button class="nav-item" id="nav-database">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-        <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-        <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
-      </svg>
-      <span>Base Datos</span>
-    </button>
-  </nav>
+    </nav>
+  </div>
 
   <!-- ============================================================== -->
   <!-- MODAL: AGREGAR / EDITAR ENLACE                                  -->
@@ -322,10 +517,10 @@
                 <option value="Salud">🩺 Salud</option>
                 <option value="Ejercicios">🏋️ Ejercicios</option>
                 <option value="Tecnología">💻 Tecnología</option>
+                <option value="Entretenimiento">🎭 Entretenimiento</option>
                 <option value="Vida Saludable">🌿 Vida Saludable</option>
                 <option value="Desarrollo Personal">🌱 Desarrollo Personal</option>
                 <option value="Desarrollo de Software">👨‍💻 Desarrollo de Software</option>
-                <option value="Entretenimiento">🎭 Entretenimiento</option>
                 <option value="Otro">🌐 Otro</option>
               </select>
             </div>
@@ -333,52 +528,53 @@
 
           <!-- Campos Editables -->
           <div class="form-group">
-            <label for="edit-title" class="form-label">Título:</label>
-            <input type="text" id="edit-title" class="form-input" placeholder="Título del enlace..." required>
+            <label for="edit-title" class="form-label">Título del Enlace:</label>
+            <input type="text" id="edit-title" class="form-input" placeholder="Título representativo">
           </div>
 
           <div class="form-group">
-            <label for="edit-summary" class="form-label">
-              Resumen del Contenido:
-              <span class="label-badge-auto">Generado automáticamente</span>
-            </label>
-            <textarea id="edit-summary" class="form-textarea" rows="3" placeholder="Resumen conciso del contenido del enlace..."></textarea>
+            <label for="edit-summary" class="form-label">Resumen Generado (1 a 3 frases):</label>
+            <textarea id="edit-summary" class="form-textarea" rows="2" placeholder="Resumen clave del recurso"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="edit-notes" class="form-label">Notas Personales o Tareas Pendientes:</label>
+            <textarea id="edit-notes" class="form-textarea" rows="2" placeholder="Agrega anotaciones personales, por qué lo guardaste..."></textarea>
           </div>
 
           <div class="form-grid-2">
             <div class="form-group">
-              <label for="edit-notes" class="form-label">Notas Personales (Opcional):</label>
-              <textarea id="edit-notes" class="form-textarea" rows="2" placeholder="Ideas clave, por qué lo guardaste..."></textarea>
+              <label for="edit-tags" class="form-label">Etiquetas (separadas por coma):</label>
+              <input type="text" id="edit-tags" class="form-input" placeholder="ej. react, finanzas, rutina">
             </div>
+
             <div class="form-group">
-              <label for="edit-tags" class="form-label">Etiquetas (Separadas por comas):</label>
-              <input type="text" id="edit-tags" class="form-input" placeholder="ej: python, rutina-brazo, finanzas">
-              
-              <div class="checkbox-fav-wrapper">
-                <label class="checkbox-label">
-                  <input type="checkbox" id="edit-is-favorite">
-                  <span class="checkbox-custom"></span>
-                  <span>⭐ Marcar como favorito</span>
-                </label>
-              </div>
+              <label for="edit-thumbnail" class="form-label">URL de Miniatura (Opcional):</label>
+              <input type="url" id="edit-thumbnail" class="form-input" placeholder="https://...">
             </div>
           </div>
 
-          <input type="hidden" id="edit-link-id" value="">
-          <input type="hidden" id="edit-thumbnail" value="">
-          <input type="hidden" id="edit-author" value="">
-          <input type="hidden" id="edit-is-fallback" value="0">
+          <div class="form-checkbox-row">
+            <label class="custom-checkbox">
+              <input type="checkbox" id="edit-is-favorite">
+              <span class="checkbox-indicator"></span>
+              <span class="checkbox-label">Marcar como Enlace Favorito ⭐</span>
+            </label>
+          </div>
+
+          <!-- Previsualización de la miniatura detectada -->
+          <div id="thumbnail-preview-box" class="thumbnail-preview-box hidden">
+            <span class="meta-small-label">Vista Previa de Imagen:</span>
+            <div class="thumb-container">
+              <img id="img-preview" src="" alt="Miniatura">
+            </div>
+          </div>
         </div>
       </div>
 
       <div class="modal-footer">
         <button type="button" id="btn-cancel-editor" class="btn btn-secondary">Cancelar</button>
-        <button type="button" id="btn-save-link" class="btn btn-primary btn-save">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-            <polyline points="17 21 17 13 7 13 7 21"></polyline>
-            <polyline points="7 3 7 8 15 8"></polyline>
-          </svg>
+        <button type="button" id="btn-save-link" class="btn btn-primary" disabled>
           <span id="btn-save-text">Guardar en Base de Datos</span>
         </button>
       </div>
@@ -386,48 +582,50 @@
   </div>
 
   <!-- ============================================================== -->
-  <!-- MODAL: GESTIÓN DE BASE DE DATOS PORTABLE (SQLITE / JSON)        -->
+  <!-- MODAL: GESTIÓN DE BASE DE DATOS SQLITE                         -->
   <!-- ============================================================== -->
-  <div id="modal-database" class="modal-overlay hidden">
+  <div id="modal-db-manager" class="modal-overlay hidden">
     <div class="modal-dialog">
       <div class="modal-header">
         <div class="modal-title-group">
-          <div class="modal-icon-badge badge-db">
+          <div class="modal-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
               <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
               <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
             </svg>
           </div>
-          <h2>Base de Datos Portable</h2>
+          <h2>Gestión de Base de Datos</h2>
         </div>
         <button class="btn-close-modal" id="btn-close-db-modal">&times;</button>
       </div>
 
       <div class="modal-body">
-        <p class="db-intro-text">
-          Tus enlaces se almacenan de forma local y 100% portable en un archivo <strong>SQLite (links.db)</strong>. Puedes descargarlo y llevarlo a cualquier equipo, servidor o hacer una copia de seguridad en segundos.
-        </p>
+        <!-- Indicador de Estado del Motor de Base de Datos -->
+        <div class="db-status-badge-container">
+          <span class="db-status-dot online"></span>
+          <span class="db-status-title" id="db-engine-title">SQLite Nativo / Turso Cloud</span>
+        </div>
 
-        <!-- Tarjeta de Estadísticas de la BD -->
-        <div class="db-stats-card">
+        <!-- Estadísticas de la Bóveda -->
+        <div class="db-stats-summary-grid">
           <div class="db-stat-item">
             <span class="db-stat-val" id="db-stat-total">0</span>
-            <span class="db-stat-lbl">Enlaces Totales</span>
+            <span class="db-stat-lbl">Mis Enlaces</span>
           </div>
           <div class="db-stat-item">
             <span class="db-stat-val" id="db-stat-favs">0</span>
             <span class="db-stat-lbl">Favoritos</span>
           </div>
           <div class="db-stat-item">
-            <span class="db-stat-val" id="db-stat-engine">SQLite 3</span>
-            <span class="db-stat-lbl">Motor Nativo</span>
+            <span class="db-stat-val" id="db-stat-engine">Turso Cloud</span>
+            <span class="db-stat-lbl">Motor DB</span>
           </div>
         </div>
 
         <!-- Descargas y Exportaciones -->
         <div class="db-actions-section">
-          <h3 class="section-subheading">Descargar y Respaldar</h3>
+          <h3 class="section-subheading">Descargar y Respaldar mis Enlaces</h3>
           <div class="db-buttons-grid">
             <a href="/api/export/db" download class="btn btn-primary btn-db-download" id="btn-download-db">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -453,8 +651,8 @@
 
         <!-- Restaurar o Importar -->
         <div class="db-actions-section">
-          <h3 class="section-subheading">Restaurar o Importar Base de Datos</h3>
-          <p class="section-desc">Sube un archivo <code>.db</code> de respaldo de SQLite o un archivo <code>.json</code>:</p>
+          <h3 class="section-subheading">Restaurar o Importar a mi Cuenta</h3>
+          <p class="section-desc">Sube un archivo <code>.db</code> de SQLite o un archivo <code>.json</code>:</p>
           
           <div class="upload-zone" id="db-upload-zone">
             <input type="file" id="file-db-upload" accept=".db,.sqlite,.sqlite3,.json" class="file-hidden-input">

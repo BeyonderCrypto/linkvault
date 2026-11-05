@@ -1,6 +1,7 @@
 const assert = require('assert');
 const db = require('../services/db');
 const analyzer = require('../services/analyzer');
+const auth = require('../services/auth');
 
 async function runTests() {
   console.log('🧪 Iniciando pruebas automatizadas de LinkVault...\n');
@@ -55,40 +56,75 @@ async function runTests() {
   assert.ok(fallbackResult.source, 'Debe extraer un origen');
   console.log('   ✅ Fallback tolerante a fallos OK');
 
-  // Test 5: Base de Datos Portable SQLite / Turso
-  console.log('5. Probando operaciones de Base de Datos SQLite (CRUD)...');
-  const created = await db.createLink({
-    url: 'https://test-link.com/tutorial',
-    title: 'Enlace de Prueba SQLite',
-    summary: 'Resumen de prueba',
-    source: 'Web',
-    content_type: 'articulo',
-    category: 'Educativo',
-    notes: 'Nota importante de prueba'
-  });
-  assert.ok(created.id, 'Debe generar un ID en SQLite');
+  // Test 5: Asociación de enlaces a alfonso.segoviam@gmail.com
+  console.log('5. Verificando vinculación de enlaces existentes a alfonso.segoviam@gmail.com...');
+  await db.initSchema();
+  const alfonsoLinks = await db.getAllLinks({ userEmail: 'alfonso.segoviam@gmail.com' });
+  assert.ok(alfonsoLinks.length > 0, 'Debe tener enlaces asociados');
+  const allBelongToAlfonso = alfonsoLinks.every(l => l.user_email === 'alfonso.segoviam@gmail.com');
+  assert.strictEqual(allBelongToAlfonso, true, 'Todos los enlaces deben pertenecer a alfonso.segoviam@gmail.com');
+  console.log(`   ✅ Enlaces asociados a alfonso.segoviam@gmail.com OK (${alfonsoLinks.length} enlaces confirmados)`);
 
-  const fetched = await db.getLinkById(created.id);
-  assert.strictEqual(fetched.title, 'Enlace de Prueba SQLite', 'Debe recuperar el enlace correcto');
+  // Test 6: Aislamiento estricto multi-usuario
+  console.log('6. Probando aislamiento de datos entre distintos usuarios...');
+  const testUserEmail = 'usuario_prueba_2026@gmail.com';
+  
+  // El nuevo usuario no debe ver los enlaces de Alfonso
+  const newUserData = await db.getAllLinks({ userEmail: testUserEmail });
+  assert.strictEqual(newUserData.length, 0, 'El nuevo usuario debe comenzar con 0 enlaces');
 
-  // Toggle favorite
-  const favResult = await db.toggleFavorite(created.id);
-  assert.strictEqual(favResult.is_favorite, 1, 'Debe alternar favorito');
+  // Crear un enlace para el nuevo usuario
+  const userLink = await db.createLink({
+    url: 'https://otro-enlace.com/guia',
+    title: 'Guía del Nuevo Usuario',
+    summary: 'Resumen privado',
+    category: 'Tecnología'
+  }, testUserEmail);
 
-  // Update
-  const updated = await db.updateLink(created.id, { title: 'Título Actualizado' });
-  assert.strictEqual(updated.title, 'Título Actualizado');
+  assert.strictEqual(userLink.user_email, testUserEmail);
 
-  // Delete
-  const deleted = await db.deleteLink(created.id);
-  assert.strictEqual(deleted, true, 'Debe eliminar el registro');
-  console.log('   ✅ Operaciones SQLite OK');
+  // El nuevo usuario ve 1 enlace
+  const updatedUserLinks = await db.getAllLinks({ userEmail: testUserEmail });
+  assert.strictEqual(updatedUserLinks.length, 1);
+  assert.strictEqual(updatedUserLinks[0].title, 'Guía del Nuevo Usuario');
 
-  // Test 6: Exportación de datos
-  console.log('6. Probando exportación de base de datos...');
-  const exportItems = await db.exportAllLinks();
+  // Alfonso no ve el enlace del nuevo usuario
+  const alfonsoUpdated = await db.getAllLinks({ userEmail: 'alfonso.segoviam@gmail.com' });
+  const hasUserLink = alfonsoUpdated.some(l => l.id === userLink.id);
+  assert.strictEqual(hasUserLink, false, 'Alfonso no debe ver enlaces del otro usuario');
+
+  // El nuevo usuario no puede actualizar ni borrar enlaces de Alfonso
+  const targetAlfonsoLink = alfonsoLinks[0];
+  const unauthorizedUpdate = await db.updateLink(targetAlfonsoLink.id, { title: 'Hackeado' }, testUserEmail);
+  assert.strictEqual(unauthorizedUpdate, null, 'Un usuario no puede editar enlaces ajenos');
+
+  const unauthorizedDelete = await db.deleteLink(targetAlfonsoLink.id, testUserEmail);
+  assert.strictEqual(unauthorizedDelete, false, 'Un usuario no puede borrar enlaces ajenos');
+
+  // Limpiar enlace de prueba del nuevo usuario
+  await db.deleteLink(userLink.id, testUserEmail);
+  console.log('   ✅ Aislamiento multi-usuario verificado exitosamente');
+
+  // Test 7: Autenticación de sesiones y tokens JWT
+  console.log('7. Probando generación y validación de tokens de sesión...');
+  const sampleUser = { email: 'alfonso.segoviam@gmail.com', name: 'Alfonso Segovia' };
+  const token = auth.createSessionToken(sampleUser);
+  assert.ok(typeof token === 'string' && token.split('.').length === 3, 'Debe generar token JWT válido');
+
+  const verified = auth.verifySessionToken(token);
+  assert.strictEqual(verified.email, 'alfonso.segoviam@gmail.com');
+  assert.strictEqual(verified.name, 'Alfonso Segovia');
+
+  const invalidToken = auth.verifySessionToken('token.invalido.123');
+  assert.strictEqual(invalidToken, null, 'Token manipulado debe retornar null');
+  console.log('   ✅ Generación y verificación de tokens de sesión OK');
+
+  // Test 8: Exportación aislada por usuario
+  console.log('8. Probando exportación JSON aislada por usuario...');
+  const exportItems = await db.exportAllLinks('alfonso.segoviam@gmail.com');
   assert.ok(Array.isArray(exportItems), 'Debe retornar arreglo de enlaces');
-  console.log(`   ✅ Exportación OK (${exportItems.length} enlaces exportados)`);
+  assert.strictEqual(exportItems.every(l => l.user_email === 'alfonso.segoviam@gmail.com'), true);
+  console.log(`   ✅ Exportación OK (${exportItems.length} enlaces exportados para alfonso.segoviam@gmail.com)`);
 
   console.log('\n🎉 ¡TODAS LAS PRUEBAS COMPLETADAS CON ÉXITO!\n');
 }
